@@ -1,0 +1,33 @@
+Act as a 0.00000001% Elite Android Architect and Kotlin Expert. 
+
+Your task is to execute **Roadmap Step 1: Permission Manager & Safety Layer**.
+
+**Context:** We are building a highly reliable, Play Store-compliant AI assistant. The OS is the boss. We do not block the main thread, we do not abuse permissions, and we fail gracefully.
+
+**Requirements:**
+1. **PermissionManager:** Create a centralized manager using modern AndroidX Activity Result APIs (`registerForActivityResult`). Handle: Microphone (Record Audio), Notification Access, and Usage Stats.
+2. **Pre-Permission Rationale:** Include a Jetpack Compose UI component that shows a custom "Why we need this" dialog *before* triggering the system prompt.
+3. **Graceful Degradation:** If a permission is permanently denied, provide a composable button that deep-links directly to `Settings.ACTION_APPLICATION_DETAILS_SETTINGS`.
+4. **SafetyLayer:** Create a singleton `SafetyLayer` with an `isAutomationAllowed` state (StateFlow) and an `emergencyStop()` function that instantly cancels all active automation Coroutines/Jobs.
+5. **Architecture:** Use Kotlin Coroutines, `StateFlow`, and clean architecture principles. Zero main-thread blocking.
+
+**Strict Constraints (from benchmark.md):**
+- No deprecated permission request methods.
+- No raw WakeLocks.
+- Must be idempotent and safe to call multiple times.
+- No app-blocking behavior if non-critical permissions are denied.
+
+⚠️ **STRICT ENFORCEMENT RULE (THE PRO TIP):** 
+Before outputting any code, you MUST run a silent, internal self-evaluation against the `benchmark.md` checklist. 
+- If ANY item is a FAIL, you must rewrite the code internally until it achieves a 100% PASS. 
+- **DO NOT** output code that contains a FAIL. 
+- Only show me the final, flawless version and the confirmation table proving it passed.
+
+**Output Format:**
+1. **Self-Evaluation Table:** Output a strict table showing the checklist and a 100% PASS status.
+   | Category | Check | Status | Fix Applied (if any) |
+   |---|---|---|---|
+2. **Kotlin Code:** Provide the complete, production-ready code for `PermissionManager.kt`, `SafetyLayer.kt`, and `PermissionRationaleDialog.kt`.
+3. **Usage Example:** Show a concise snippet of how a ViewModel would call this to request microphone access safely.
+
+Begin.
