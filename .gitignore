@@ -20,3 +20,4 @@ Thumbs.db
 *.jks
 *.keystore
 .env
+*.hprof
