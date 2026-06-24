@@ -109,26 +109,31 @@ class SpeechToTextManager(private val context: Context) {
             override fun onError(error: Int) {
                 val message = when (error) {
                     SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
-                    SpeechRecognizer.ERROR_CLIENT -> "Recognizer restarting…"
-                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission required"
+                    SpeechRecognizer.ERROR_CLIENT -> "Client-side error"
+                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Mic permission required"
                     SpeechRecognizer.ERROR_NETWORK -> "Network error"
                     SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
-                    SpeechRecognizer.ERROR_NO_MATCH -> "Couldn't understand — try again"
-                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer busy — please wait"
+                    SpeechRecognizer.ERROR_NO_MATCH -> "Try speaking again"
+                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Mic is busy"
                     SpeechRecognizer.ERROR_SERVER -> "Server error"
-                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech detected — tap and hold to talk"
-                    else -> "Unknown recognizer error"
+                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech detected"
+                    SpeechRecognizer.ERROR_SERVER_DISCONNECTED -> "Recognition service lost"
+                    SpeechRecognizer.ERROR_TOO_MANY_REQUESTS -> "Too many requests"
+                    else -> "Error: $error"
                 }
                 Log.w(TAG, "onError: $error → $message")
 
-                // For CLIENT and BUSY errors, silently recover to Idle.
-                // For NO_MATCH / SPEECH_TIMEOUT, also just go idle so user can retry.
+                // For transient errors, just reset to Idle so the user can try again immediately.
                 if (error == SpeechRecognizer.ERROR_CLIENT ||
                     error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ||
                     error == SpeechRecognizer.ERROR_NO_MATCH ||
-                    error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+                    error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
+                    error == SpeechRecognizer.ERROR_SERVER_DISCONNECTED ||
+                    error == 13 // Service busy/unavailable
                 ) {
+                    Log.i(TAG, "Transient error $error - resetting recognizer")
                     isActive = false
+                    destroyRecognizerSync() // Force a fresh start for next time
                     _speechState.value = SpeechState.Idle
                 } else {
                     isActive = false

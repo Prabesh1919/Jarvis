@@ -36,7 +36,13 @@ import com.jarvis.brain.LlmClient
 import com.jarvis.voice.SpeechState
 import com.jarvis.voice.SpeechToTextManager
 import com.jarvis.voice.TextToSpeechManager
+import com.jarvis.voice.TtsState
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.input.pointer.pointerInput
+import com.jarvis.safety.PermissionManager
+import com.jarvis.safety.PermissionType
+import com.jarvis.safety.PermissionState
+import androidx.compose.foundation.gestures.detectTapGestures
 import kotlinx.coroutines.launch
 import kotlin.math.sin
 
@@ -62,38 +68,34 @@ fun HomeScreen(
     var manualLoading by remember { mutableStateOf(false) }
     var manualText by remember { mutableStateOf("") }
 
-    // Core pipeline states — must be declared before LaunchedEffect uses them
-    var llmResponse by remember { mutableStateOf<String?>(null) }
+    val ttsState by ttsManager.ttsState.collectAsState()
     var isProcessing by remember { mutableStateOf(false) }
-    var lastUserText by remember { mutableStateOf("") }
+    var lastResponseText by remember { mutableStateOf<String?>(null) }
 
-    // STT to LLM to TTS Loop — SINGLE source of truth
-    // Only fires on FINAL Results (not PartialResults) to prevent overlapping LLM calls.
+    // STT to LLM to TTS Loop
     LaunchedEffect(speechState) {
         if (speechState is SpeechState.Results) {
             val userText = speechState.text
             if (userText.isNotBlank() && !isProcessing) {
-                lastUserText = userText
                 isProcessing = true
+                lastResponseText = null // Reset for new turn
                 chatMessages.add(ChatMessage("You", userText, true))
                 try {
                     val response = LlmClient.generateContent(context, userText)
-                    llmResponse = response
                     chatMessages.add(ChatMessage("JARVISH", response, false))
+                    lastResponseText = response
                     ttsManager.speak(response)
                 } catch (e: Exception) {
-                    val err = "Error: ${e.message}"
-                    llmResponse = err
-                    chatMessages.add(ChatMessage("JARVISH", err, false))
+                    chatMessages.add(ChatMessage("JARVISH", "Error: ${e.message}", false))
                 } finally {
                     isProcessing = false
                     sttManager.resetState()
                 }
             }
         } else if (speechState is SpeechState.Listening) {
-            llmResponse = null
-            lastUserText = ""
-            ttsManager.stopSpeaking()
+            if (ttsState is TtsState.Speaking) {
+                ttsManager.stopSpeaking()
+            }
         }
     }
 
@@ -135,9 +137,9 @@ fun HomeScreen(
             .verticalScroll(scrollState)
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
         // 1. Central Optimal Dial
         Box(
@@ -381,7 +383,7 @@ fun HomeScreen(
                     )
                 }
 
-                Divider(color = colors.onSurfaceVariant.copy(alpha = 0.1f))
+                HorizontalDivider(color = colors.onSurfaceVariant.copy(alpha = 0.1f))
 
                 // Battery Section
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -496,7 +498,7 @@ fun HomeScreen(
                     letterSpacing = 1.5.sp
                 )
 
-                Divider(color = colors.accent.copy(alpha = 0.2f))
+                HorizontalDivider(color = colors.accent.copy(alpha = 0.2f))
 
                 // Chat messages display — uses the top-level chatMessages list
                 // (NO inner declaration here — that would shadow the outer one)
@@ -553,8 +555,9 @@ fun HomeScreen(
                             manualLoading = true
                             coroutineScope.launch {
                                 try {
-                                    val response = com.jarvis.brain.LlmClient.generateContent(context, text)
+                                    val response = LlmClient.generateContent(context, text)
                                     chatMessages.add(ChatMessage("JARVISH", response, false))
+                                    lastResponseText = response
                                     ttsManager.speak(response)
                                 } catch (e: Exception) {
                                     chatMessages.add(ChatMessage("JARVISH", "Error: ${e.message}", false))
@@ -599,7 +602,7 @@ fun HomeScreen(
                         speechState is SpeechState.Listening || speechState is SpeechState.PartialResults ->
                             Color(0xFFFF1E27) // Red = transmitting (you're talking)
                         isProcessing -> Color(0xFFFFD600) // Yellow = receiving (AI thinking)
-                        llmResponse != null -> Color(0xFF00E676) // Green = received response
+                        lastResponseText != null -> Color(0xFF00E676) // Green = received response
                         else -> Color(0xFFB0BEC5) // Gray = idle
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -613,7 +616,7 @@ fun HomeScreen(
                             text = when {
                                 speechState is SpeechState.Listening || speechState is SpeechState.PartialResults -> "TX"
                                 isProcessing -> "RX WAIT"
-                                llmResponse != null -> "RX OK"
+                                lastResponseText != null -> "RX OK"
                                 else -> "STANDBY"
                             },
                             fontSize = 10.sp,
@@ -628,7 +631,7 @@ fun HomeScreen(
                         speechState is SpeechState.Error -> 0
                         speechState is SpeechState.Listening || speechState is SpeechState.PartialResults -> 4
                         isProcessing -> 3
-                        llmResponse != null -> 4
+                        lastResponseText != null -> 4
                         else -> 2
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.Bottom) {
@@ -670,14 +673,27 @@ fun HomeScreen(
                             color = if (isPttActive) colors.secondaryGlow else colors.surfaceBorder,
                             shape = CircleShape
                         )
-                        .clickable {
-                            coroutineScope.launch {
-                                if (isPttActive) {
-                                    sttManager.stopListening()
-                                } else {
-                                    sttManager.startListening()
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onPress = {
+                                    val micState = PermissionManager.checkPermissionState(context, PermissionType.MICROPHONE)
+                                    if (micState != PermissionState.Granted) {
+                                        PermissionManager.requestPermission(PermissionType.MICROPHONE)
+                                        return@detectTapGestures
+                                    }
+
+                                    coroutineScope.launch {
+                                        sttManager.startListening()
+                                    }
+                                    try {
+                                        awaitRelease()
+                                    } finally {
+                                        coroutineScope.launch {
+                                            sttManager.stopListening()
+                                        }
+                                    }
                                 }
-                            }
+                            )
                         },
                     contentAlignment = Alignment.Center
                 ) {
@@ -701,21 +717,23 @@ fun HomeScreen(
                 Text(
                     text = when {
                         speechState is SpeechState.PartialResults -> "🎙️ ${speechState.text}"
-                        speechState is SpeechState.Listening -> "🎙️ Hold to talk..."
-                        speechState is SpeechState.Results -> "✅ Sent: \"${speechState.text}\""
+                        speechState is SpeechState.Listening -> "🎙️ LISTENING..."
+                        speechState is SpeechState.Results -> "✅ SENDING..."
                         speechState is SpeechState.Error -> "❌ ${speechState.errorMsg}"
-                        isProcessing -> "🤖 JARVISH is thinking..."
-                        llmResponse != null -> "✅ Response received"
-                        else -> "👆 Tap to start talking"
+                        isProcessing -> "🤖 THINKING..."
+                        ttsState is TtsState.Speaking -> "🔊 SPEAKING..."
+                        else -> "🎙️ HOLD TO TALK"
                     },
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.Black,
                     color = when {
                         speechState is SpeechState.Error -> Color(0xFFFF1E27)
                         isPttActive -> colors.accent
+                        ttsState is TtsState.Speaking -> colors.secondaryGlow
                         else -> colors.onSurfaceVariant
                     },
-                    maxLines = 2
+                    maxLines = 2,
+                    textAlign = TextAlign.Center
                 )
 
                 // Frequency display (radio style)
