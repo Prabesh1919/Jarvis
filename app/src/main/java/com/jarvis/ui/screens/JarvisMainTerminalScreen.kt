@@ -1,6 +1,8 @@
 package com.jarvis.ui.screens
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import androidx.compose.animation.*
@@ -27,10 +29,13 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.jarvis.brain.LlmClient
 import com.jarvis.brain.LocalLlmEngine
 import com.jarvis.config.AppConfig
 import com.jarvis.context.DeviceContext
+import com.jarvis.safety.PermissionManager
+import com.jarvis.safety.PermissionType
 import com.jarvis.safety.SafetyLayer
 import com.jarvis.ui.components.ArcReactorWidget
 import com.jarvis.ui.theme.JarvisColors
@@ -65,25 +70,33 @@ fun isNetworkConnected(context: Context): Boolean {
 
 /**
  * Smart LLM prompt executor:
- * 1. Tries configured Cloud LLM (Gemini 2.5 Flash / OpenRouter) first.
- * 2. If network drops or Cloud fails -> Automatically switches to Local Llama 3.2 GGUF engine.
+ * 1. Checks if network is available. If OFFLINE -> Routes IMMEDIATELY (0ms delay) to Local Llama 3.2 GGUF engine!
+ * 2. If ONLINE -> Tries configured Cloud LLM (Gemini 2.5 Flash / OpenRouter).
+ * 3. On any cloud network drop -> Failover seamlessly to Local Llama 3.2 GGUF engine.
  */
 suspend fun executeSmartLlmPrompt(context: Context, text: String): Pair<String, String> {
-    val cloudModel = AppConfig.getLlmModel(context)
-    
-    // Auto-provision default local GGUF container so offline mode is instantly ready
-    LocalLlmEngine.autoProvisionDefaultModel(context)
-
-    try {
-        val cloudResponse = LlmClient.generateContent(context, text)
-        return Pair(cloudResponse, cloudModel)
-    } catch (cloudErr: Exception) {
-        // Automatic failover to Local Llama 3.2 GGUF engine
+    // If device is offline, DO NOT wait for 15s cloud timeout — route IMMEDIATELY to Local GGUF!
+    if (!isNetworkConnected(context)) {
+        LocalLlmEngine.autoProvisionDefaultModel(context)
         try {
             val localResponse = LocalLlmEngine.generate(context, text)
             return Pair(localResponse, "LOCAL LLAMA 3.2 1B (OFFLINE GGUF)")
         } catch (ggufErr: Exception) {
-            return Pair("[OFFLINE ERROR] GGUF Engine: ${ggufErr.message}", "LOCAL LLAMA 3.2 1B (OFFLINE GGUF)")
+            return Pair("[OFFLINE ENGINE] ${ggufErr.message}", "LOCAL LLAMA 3.2 1B (OFFLINE GGUF)")
+        }
+    }
+
+    val cloudModel = AppConfig.getLlmModel(context)
+    try {
+        val cloudResponse = LlmClient.generateContent(context, text)
+        return Pair(cloudResponse, cloudModel)
+    } catch (cloudErr: Exception) {
+        LocalLlmEngine.autoProvisionDefaultModel(context)
+        try {
+            val localResponse = LocalLlmEngine.generate(context, text)
+            return Pair(localResponse, "LOCAL LLAMA 3.2 1B (OFFLINE GGUF)")
+        } catch (ggufErr: Exception) {
+            return Pair("[OFFLINE ERROR] ${ggufErr.message}", "LOCAL LLAMA 3.2 1B (OFFLINE GGUF)")
         }
     }
 }
@@ -160,33 +173,42 @@ fun JarvisMainTerminalScreen(
         }
     }
 
-    // STT -> LLM -> Voice AI Pipeline with Automatic Offline Fallback
+    // Handle SpeechState events (including Errors & Results)
     LaunchedEffect(speechState) {
-        if (speechState is SpeechState.Results) {
-            val userText = speechState.text
-            if (userText.isNotBlank() && !isProcessing) {
-                isProcessing = true
-                lastResponseText = null
-                chatMessages.add(ChatMessage("You", userText, true))
-                try {
-                    val (response, usedModel) = executeSmartLlmPrompt(context, userText)
-                    activeModelDisplay = usedModel
-                    isOnline = !usedModel.contains("OFFLINE")
-                    chatMessages.add(ChatMessage("JARVISH", response, false, modelName = usedModel))
-                    lastResponseText = response
-                    speakWithVoiceModel(context, response)
-                } catch (e: Exception) {
-                    chatMessages.add(ChatMessage("JARVISH", "[ERROR] ${e.message}", false, modelName = activeModelDisplay))
-                } finally {
-                    isProcessing = false
-                    sttManager.resetState()
+        when (speechState) {
+            is SpeechState.Results -> {
+                val userText = (speechState as SpeechState.Results).text
+                if (userText.isNotBlank() && !isProcessing) {
+                    isProcessing = true
+                    lastResponseText = null
+                    chatMessages.add(ChatMessage("You", userText, true))
+                    try {
+                        val (response, usedModel) = executeSmartLlmPrompt(context, userText)
+                        activeModelDisplay = usedModel
+                        isOnline = !usedModel.contains("OFFLINE")
+                        chatMessages.add(ChatMessage("JARVISH", response, false, modelName = usedModel))
+                        lastResponseText = response
+                        speakWithVoiceModel(context, response)
+                    } catch (e: Exception) {
+                        chatMessages.add(ChatMessage("JARVISH", "[ERROR] ${e.message}", false, modelName = activeModelDisplay))
+                    } finally {
+                        isProcessing = false
+                        sttManager.resetState()
+                    }
                 }
             }
-        } else if (speechState is SpeechState.Listening) {
-            GeminiVoiceEngine.stopPlayback()
-            if (ttsState is TtsState.Speaking) {
-                ttsManager.stopSpeaking()
+            is SpeechState.Error -> {
+                val errorText = (speechState as SpeechState.Error).errorMsg
+                chatMessages.add(ChatMessage("JARVISH", "[MIC NOTICE] $errorText", false, modelName = activeModelDisplay))
+                sttManager.resetState()
             }
+            is SpeechState.Listening -> {
+                GeminiVoiceEngine.stopPlayback()
+                if (ttsState is TtsState.Speaking) {
+                    ttsManager.stopSpeaking()
+                }
+            }
+            else -> {}
         }
     }
 
@@ -321,7 +343,7 @@ fun JarvisMainTerminalScreen(
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // 3. Quick Action Chips
+        // 4. Quick Action Chips
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -352,7 +374,7 @@ fun JarvisMainTerminalScreen(
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // 4. Command Prompt & Microphone Dock
+        // 5. Command Prompt & Microphone Dock
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -430,11 +452,20 @@ fun JarvisMainTerminalScreen(
                     )
                 }
 
-                val isListening = speechState is SpeechState.Listening
                 val micBg = if (isListening) colors.accent else colors.surfaceVariant
 
                 IconButton(
                     onClick = {
+                        // Check runtime microphone permission automatically on click
+                        val hasMicPerm = ContextCompat.checkSelfPermission(
+                            context, Manifest.permission.RECORD_AUDIO
+                        ) == PackageManager.PERMISSION_GRANTED
+
+                        if (!hasMicPerm) {
+                            PermissionManager.requestPermission(PermissionType.MICROPHONE)
+                            return@IconButton
+                        }
+
                         coroutineScope.launch {
                             if (isListening) {
                                 sttManager.stopListening()
