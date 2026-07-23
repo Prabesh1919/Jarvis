@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity() {
         ttsManager = TextToSpeechManager(this)
 
         setContent {
-            var currentTheme by remember { mutableStateOf(AppThemeType.RED_MATRIX) }
+            var currentTheme by remember { mutableStateOf(AppThemeType.HACKER_CYBER) }
             var isDarkTheme by remember { mutableStateOf(true) }
 
             val jarvisColors = getColorsForTheme(currentTheme, isDarkTheme)

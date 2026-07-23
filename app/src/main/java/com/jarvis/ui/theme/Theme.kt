@@ -4,6 +4,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 
 enum class AppThemeType(val displayName: String) {
+    HACKER_CYBER("Hacker Cyber"),
     RED_MATRIX("Red Matrix"),
     BLUE_OCEAN("Blue Ocean"),
     GREEN_TECH("Green Tech"),
@@ -28,12 +29,27 @@ data class JarvisColors(
 )
 
 val LocalJarvisColors = staticCompositionLocalOf {
-    getColorsForTheme(AppThemeType.RED_MATRIX, isDark = true)
+    getColorsForTheme(AppThemeType.HACKER_CYBER, isDark = true)
 }
 
 fun getColorsForTheme(theme: AppThemeType, isDark: Boolean): JarvisColors {
     return if (isDark) {
         when (theme) {
+            AppThemeType.HACKER_CYBER -> JarvisColors(
+                accent = Color(0xFF00FF41),
+                secondaryGlow = Color(0xFF008000),
+                background = Color(0xFF020904),
+                surface = Color(0xFF06140B),
+                surfaceVariant = Color(0xFF0A2012),
+                onBackground = Color(0xFF00FF41),
+                onSurface = Color(0xFF00FF41),
+                onSurfaceVariant = Color(0xFF00B32D),
+                isDark = true,
+                cardGradStart = Color(0xFF03190C),
+                cardGradEnd = Color(0xFF010A05),
+                surfaceGlass = Color(0xFF06140B).copy(alpha = 0.35f),
+                surfaceBorder = Color(0xFF00FF41).copy(alpha = 0.45f)
+            )
             AppThemeType.RED_MATRIX -> JarvisColors(
                 accent = Color(0xFFFF1E27),
                 secondaryGlow = Color(0xFFFF5252),
