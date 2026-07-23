@@ -185,7 +185,7 @@ fun JarvisMainTerminalScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // Safety Guard Toggle Button
                     IconButton(
-                        onClick = { SafetyLayer.toggleAutomation() },
+                        onClick = { SafetyLayer.setAutomationAllowed(!isSafetyAllowed) },
                         modifier = Modifier.size(24.dp)
                     ) {
                         Text(if (isSafetyAllowed) "🛡️" else "🛑", fontSize = 12.sp)
