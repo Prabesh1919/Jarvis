@@ -68,13 +68,16 @@ object LlmClient {
                     }
 
                     val responseJson = JSONObject(response.toString())
-                    val candidates = responseJson.getJSONArray("candidates")
-                    if (candidates.length() > 0) {
+                    val candidates = responseJson.optJSONArray("candidates")
+                    if (candidates != null && candidates.length() > 0) {
                         val firstCandidate = candidates.getJSONObject(0)
-                        val contentObj = firstCandidate.getJSONObject("content")
-                        val parts = contentObj.getJSONArray("parts")
-                        if (parts.length() > 0) {
-                            return@withContext parts.getJSONObject(0).getString("text")
+                        val contentObj = firstCandidate.optJSONObject("content")
+                        val parts = contentObj?.optJSONArray("parts")
+                        if (parts != null && parts.length() > 0) {
+                            val text = parts.getJSONObject(0).optString("text", "")
+                            if (text.isNotBlank()) {
+                                return@withContext text
+                            }
                         }
                     }
                     throw IllegalStateException("Received empty content representation from Gemini.")
