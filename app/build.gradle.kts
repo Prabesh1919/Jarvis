@@ -133,9 +133,6 @@ dependencies {
     // --- JSON Parsing (Step 9: Workflow serialization) ---
     // Uses org.json (bundled with Android SDK, no extra dependency needed)
 
-    // --- ONNX Runtime (Local Neural Voice Model for offline speech) ---
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.17.3")
-
     // --- Testing ---
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

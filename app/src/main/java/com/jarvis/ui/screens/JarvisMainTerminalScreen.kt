@@ -45,16 +45,12 @@ import kotlinx.coroutines.launch
 /**
  * Speaks response using Voice AI Models exclusively (0% Android TTS):
  * 1. ONLINE: Gemini Native Audio Engine (Charon Voice Model - same as desktop JARVIS).
- * 2. OFFLINE: Local Neural ONNX Voice Model Engine (Piper VITS Neural Voice).
+ * 2. OFFLINE: Local On-Device Voice AI Synthesizer (zero downloads required).
  */
 suspend fun speakWithVoiceModel(context: android.content.Context, text: String) {
     val usedGemini = GeminiVoiceEngine.speak(context, text)
     if (!usedGemini) {
-        val usedLocalVoice = com.jarvis.voice.LocalVoiceModel.speak(context, text)
-        if (!usedLocalVoice) {
-            com.jarvis.voice.LocalVoiceModel.downloadModel(context)
-            com.jarvis.voice.LocalVoiceModel.speak(context, text)
-        }
+        com.jarvis.voice.LocalVoiceModel.speak(context, text)
     }
 }
 
