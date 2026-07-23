@@ -141,10 +141,10 @@ class TextToSpeechManager(private val context: Context) : TextToSpeech.OnInitLis
         })
     }
 
-    fun speak(text: String, onComplete: () -> Unit = {}) {
+    fun speak(text: String, onComplete: () -> Unit = {}): Boolean {
         if (_ttsState.value is TtsState.Error || tts == null) {
             onComplete()
-            return
+            return false
         }
 
         onCompleteCallback = onComplete
@@ -152,9 +152,11 @@ class TextToSpeechManager(private val context: Context) : TextToSpeech.OnInitLis
         val focusGranted = requestAudioFocus()
         if (focusGranted) {
             val utteranceId = UUID.randomUUID().toString()
-            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+            val result = tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+            return result == TextToSpeech.SUCCESS
         } else {
             onComplete()
+            return false
         }
     }
 

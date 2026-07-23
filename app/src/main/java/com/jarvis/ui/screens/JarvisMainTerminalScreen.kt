@@ -60,9 +60,8 @@ suspend fun speakWithVoiceModel(
 ) {
     val usedGemini = GeminiVoiceEngine.speak(context, text)
     if (!usedGemini) {
-        if (ttsManager != null && ttsManager.ttsState.value !is TtsState.Error) {
-            ttsManager.speak(text)
-        } else {
+        val spokeTts = ttsManager?.speak(text) ?: false
+        if (!spokeTts) {
             com.jarvis.voice.LocalVoiceModel.speak(context, text)
         }
     }
