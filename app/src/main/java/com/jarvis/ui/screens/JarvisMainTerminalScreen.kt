@@ -42,13 +42,18 @@ import com.jarvis.voice.TtsState
 import kotlinx.coroutines.launch
 
 /**
- * Speaks response using Gemini Native Audio (Charon voice) first.
- * Falls back to Android TTS only if Gemini Audio is unavailable (offline/no key).
+ * Speaks response using Voice AI Models exclusively (0% Android TTS):
+ * 1. ONLINE: Gemini Native Audio Engine (Charon Voice Model - same as desktop JARVIS).
+ * 2. OFFLINE: Local Neural ONNX Voice Model Engine (Piper VITS Neural Voice).
  */
-suspend fun speakWithGeminiVoice(context: android.content.Context, text: String, ttsManager: TextToSpeechManager) {
+suspend fun speakWithVoiceModel(context: android.content.Context, text: String) {
     val usedGemini = GeminiVoiceEngine.speak(context, text)
     if (!usedGemini) {
-        ttsManager.speak(text)
+        val usedLocalVoice = com.jarvis.voice.LocalVoiceModel.speak(context, text)
+        if (!usedLocalVoice) {
+            com.jarvis.voice.LocalVoiceModel.downloadModel(context)
+            com.jarvis.voice.LocalVoiceModel.speak(context, text)
+        }
     }
 }
 
@@ -145,7 +150,7 @@ fun JarvisMainTerminalScreen(
                     isOnline = !usedModel.contains("OFFLINE")
                     chatMessages.add(ChatMessage("JARVISH", response, false, modelName = usedModel))
                     lastResponseText = response
-                    speakWithGeminiVoice(context, response, ttsManager)
+                    speakWithVoiceModel(context, response)
                 } catch (e: Exception) {
                     chatMessages.add(ChatMessage("JARVISH", "[ERROR] ${e.message}", false, modelName = activeModelDisplay))
                 } finally {
@@ -349,7 +354,7 @@ fun JarvisMainTerminalScreen(
                                 isOnline = !usedModel.contains("OFFLINE")
                                 chatMessages.add(ChatMessage("JARVISH", response, false, modelName = usedModel))
                                 lastResponseText = response
-                                speakWithGeminiVoice(context, response, ttsManager)
+                                speakWithVoiceModel(context, response)
                             } catch (e: Exception) {
                                 chatMessages.add(ChatMessage("JARVISH", "[ERROR] ${e.message}", false, modelName = activeModelDisplay))
                             } finally {
