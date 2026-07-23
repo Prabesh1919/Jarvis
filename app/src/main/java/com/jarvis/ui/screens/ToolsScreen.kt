@@ -1,5 +1,7 @@
 package com.jarvis.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -7,7 +9,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -25,19 +31,20 @@ fun ToolsScreen(
             .fillMaxSize()
             .verticalScroll(scrollState)
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "SYSTEM UTILITY TOOLS",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Black,
+            text = "[SYSTEM TOOL REGISTRY]",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
             color = colors.accent,
-            letterSpacing = 1.5.sp
+            letterSpacing = 1.sp
         )
 
         // 1. System Tools Category
         ToolCategorySection(
-            title = "SYSTEM PERFORMANCE",
+            title = "> PERFORMANCE ENGINE",
             tools = listOf(
                 ToolItem("Junk Cleaner", "🛠️", "OptimizerScreen"),
                 ToolItem("Memory Boost", "🚀", "PerformanceScreen"),
@@ -49,7 +56,7 @@ fun ToolsScreen(
 
         // 2. Security Tools Category
         ToolCategorySection(
-            title = "SECURITY & PRIVACY",
+            title = "> SECURITY & PRIVACY VAULT",
             tools = listOf(
                 ToolItem("Virus Scan", "🛡️", "SecurityScreen"),
                 ToolItem("App Lock", "🔒", "AppLockScreen"),
@@ -61,16 +68,16 @@ fun ToolsScreen(
 
         // 3. Utility Tools Category
         ToolCategorySection(
-            title = "INTELLIGENT UTILITIES",
+            title = "> INTELLIGENT AGENT UTILITIES",
             tools = listOf(
                 ToolItem("Game Booster", "🎮", "GameBoosterScreen"),
-                ToolItem("On-Device RAG", "📁", "RagSearchScreen"),
-                ToolItem("Automation Tasks", "🤖", "AutomationScreen")
+                ToolItem("Local RAG Search", "📁", "RagSearchScreen"),
+                ToolItem("Automation Agent", "🤖", "AutomationScreen")
             ),
             onToolSelect = onToolSelect
         )
         
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
@@ -88,61 +95,64 @@ fun ToolCategorySection(
 ) {
     val colors = LocalJarvisColors.current
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             text = title,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            color = colors.onSurfaceVariant,
-            letterSpacing = 1.sp
+            fontFamily = FontFamily.Monospace,
+            color = colors.onSurfaceVariant
         )
 
-        // Display as 2x2 cards manually to avoid inner scroll conflict in verticalScroll
         val rows = tools.chunked(2)
         for (row in rows) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 for (tool in row) {
                     Card(
                         modifier = Modifier
                             .weight(1f)
-                            .height(76.dp)
+                            .height(68.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(colors.surfaceGlass)
+                            .border(1.dp, colors.surfaceBorder, RoundedCornerShape(10.dp))
                             .clickable { onToolSelect(tool.destination) },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = colors.surface)
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                                .padding(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(tool.icon, fontSize = 24.sp)
+                            Text(tool.icon, fontSize = 20.sp)
                             Column {
                                 Text(
                                     tool.name,
-                                    fontSize = 13.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
                                     color = colors.onSurface
                                 )
                                 Text(
-                                    "Tap to optimize",
-                                    fontSize = 9.sp,
-                                    color = colors.onSurfaceVariant
+                                    "[ EXECUTE ]",
+                                    fontSize = 8.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = colors.accent
                                 )
                             }
                         }
                     }
                 }
-                // Placeholder to complete Row if odd count
                 if (row.size == 1) {
                     Spacer(modifier = Modifier.weight(1f))
                 }
             }
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(4.dp))
         }
     }
 }

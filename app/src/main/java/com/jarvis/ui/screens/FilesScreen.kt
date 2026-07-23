@@ -1,5 +1,7 @@
 package com.jarvis.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -11,12 +13,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jarvis.ui.theme.LocalJarvisColors
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FilesScreen() {
     val colors = LocalJarvisColors.current
@@ -43,50 +45,65 @@ fun FilesScreen() {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "FILE MANAGER",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Black,
+            text = "[LOCAL FILE RAG MANAGER]",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
             color = colors.accent,
-            letterSpacing = 1.5.sp
+            letterSpacing = 1.sp
         )
 
-        // Search Bar
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Search files...", color = colors.onSurfaceVariant.copy(alpha = 0.5f)) },
+            placeholder = {
+                Text(
+                    "> Search local documents...",
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = colors.onSurfaceVariant.copy(alpha = 0.5f)
+                )
+            },
+            textStyle = androidx.compose.ui.text.TextStyle(
+                fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace,
+                color = colors.onSurface
+            ),
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(10.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = colors.onSurface,
                 unfocusedTextColor = colors.onSurface,
                 focusedBorderColor = colors.accent,
-                unfocusedBorderColor = colors.onSurfaceVariant.copy(alpha = 0.3f)
+                unfocusedBorderColor = colors.surfaceBorder
             ),
             singleLine = true
         )
 
-        // Storage Usage Card
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.surface)
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(colors.surfaceGlass)
+                .border(1.dp, colors.surfaceBorder, RoundedCornerShape(12.dp)),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.Transparent)
         ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "INTERNAL STORAGE STATUS",
+                    "> INTERNAL STORAGE TELEMETRY",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
-                    color = colors.onSurfaceVariant,
-                    letterSpacing = 1.sp
+                    fontFamily = FontFamily.Monospace,
+                    color = colors.onSurfaceVariant
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("128 GB / 256 GB Used", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.onSurface)
-                    Text("50%", fontSize = 16.sp, fontWeight = FontWeight.Black, color = colors.accent)
+                    Text("128 GB / 256 GB Used", fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = colors.onSurface)
+                    Text("50%", fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = colors.accent)
                 }
                 LinearProgressIndicator(
                     progress = { 0.5f },
@@ -100,48 +117,52 @@ fun FilesScreen() {
             }
         }
 
-        // File Categories Grid
         Text(
-            "FILE CATEGORIES",
+            "> INDEXED CATEGORIES",
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            color = colors.onSurfaceVariant,
-            letterSpacing = 1.sp
+            fontFamily = FontFamily.Monospace,
+            color = colors.onSurfaceVariant
         )
 
         val rows = fileCategories.chunked(2)
         for (row in rows) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 for (cat in row) {
                     Card(
                         modifier = Modifier
                             .weight(1f)
-                            .height(68.dp)
-                            .clickable { /* open category action */ },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = colors.surface)
+                            .height(64.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(colors.surfaceGlass)
+                            .border(1.dp, colors.surfaceBorder, RoundedCornerShape(10.dp))
+                            .clickable { },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                .padding(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(cat.emoji, fontSize = 22.sp)
+                            Text(cat.emoji, fontSize = 20.sp)
                             Column {
                                 Text(
                                     cat.name,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
                                     color = colors.onSurface
                                 )
                                 Text(
                                     cat.count,
                                     fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
                                     color = colors.onSurfaceVariant
                                 )
                             }
@@ -149,7 +170,7 @@ fun FilesScreen() {
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
         }
     }
 }

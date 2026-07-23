@@ -16,8 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jarvis.config.AppConfig
@@ -37,7 +37,6 @@ fun ProfileScreen(
     val scrollState = rememberScrollState()
     val context = LocalContext.current
 
-    // API Key states
     var apiKeyText by remember { mutableStateOf("") }
     var isKeySaved by remember { mutableStateOf(AppConfig.isApiKeyConfigured(context)) }
 
@@ -49,86 +48,93 @@ fun ProfileScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "USER PROFILE & CONFIGURATION",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Black,
+            text = "[SYSTEM CONFIGURATION & KEYS]",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
             color = colors.accent,
-            letterSpacing = 1.5.sp
+            letterSpacing = 1.sp
         )
 
-        // 1. User Info Card
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.surface)
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(colors.surfaceGlass)
+                .border(1.dp, colors.surfaceBorder, RoundedCornerShape(12.dp)),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.Transparent)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    .padding(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // User Avatar placeholder
                 Box(
                     modifier = Modifier
-                        .size(64.dp)
+                        .size(54.dp)
                         .clip(CircleShape)
                         .background(colors.accent.copy(alpha = 0.15f))
-                        .border(2.dp, colors.accent, CircleShape),
+                        .border(1.dp, colors.accent, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("🤖", fontSize = 28.sp)
+                    Text("🤖", fontSize = 24.sp)
                 }
 
                 Column {
                     Text(
-                        "JARVISH USER",
-                        fontSize = 16.sp,
+                        "JARVISH OPERATOR",
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
                         color = colors.onSurface
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        "★ Premium System Operator",
-                        fontSize = 11.sp,
+                        "★ SYSTEM PRIVILEGE: ROOT",
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
                         color = colors.accent
                     )
                 }
             }
         }
 
-        // 2. Styling Themes Block
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.surface)
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(colors.surfaceGlass)
+                .border(1.dp, colors.surfaceBorder, RoundedCornerShape(12.dp)),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.Transparent)
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    "INTERFACE CUSTOMIZATION",
+                    "> THEME SELECTION",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = colors.onSurfaceVariant,
-                    letterSpacing = 1.sp
+                    fontFamily = FontFamily.Monospace,
+                    color = colors.onSurfaceVariant
                 )
 
-                // Dark/Light switch row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Dark Theme Mode", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = colors.onSurface)
+                    Text("Dark Theme Mode", fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = colors.onSurface)
                     Switch(
                         checked = isDark,
                         onCheckedChange = onDarkToggle,
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
+                            checkedThumbColor = Color.Black,
                             checkedTrackColor = colors.accent,
                             uncheckedThumbColor = colors.onSurfaceVariant,
                             uncheckedTrackColor = colors.surfaceVariant
@@ -136,32 +142,32 @@ fun ProfileScreen(
                     )
                 }
 
-                Divider(color = colors.onSurfaceVariant.copy(alpha = 0.08f))
+                HorizontalDivider(color = colors.surfaceBorder.copy(alpha = 0.3f))
 
-                // Theme color selection
-                Text("Theme Color Accent", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = colors.onSurface)
+                Text("Theme Color Accent", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = colors.onSurface)
 
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     AppThemeType.values().forEach { themeOption ->
                         val isSelected = currentTheme == themeOption
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(6.dp))
                                 .background(if (isSelected) colors.surfaceVariant else Color.Transparent)
                                 .clickable { onThemeChange(themeOption) }
-                                .padding(10.dp),
+                                .padding(8.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = themeOption.displayName,
-                                fontSize = 13.sp,
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                 color = colors.onSurface
                             )
                             if (isSelected) {
-                                Text("✓", fontSize = 14.sp, fontWeight = FontWeight.Black, color = colors.accent)
+                                Text("✓", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = colors.accent)
                             }
                         }
                     }
@@ -169,22 +175,25 @@ fun ProfileScreen(
             }
         }
 
-        // 3. Vault & Gemini Secret Config
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.surface)
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(colors.surfaceGlass)
+                .border(1.dp, colors.surfaceBorder, RoundedCornerShape(12.dp)),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.Transparent)
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    "LLM & BRAIN SECRETS",
+                    "> SECURE VAULT KEYS",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = colors.onSurfaceVariant,
-                    letterSpacing = 1.sp
+                    fontFamily = FontFamily.Monospace,
+                    color = colors.onSurfaceVariant
                 )
 
                 if (isKeySaved) {
@@ -194,10 +203,10 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            "🔑 Gemini API Key configured",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Green
+                            "🔑 Gemini Key Configured",
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = colors.accent
                         )
                         Button(
                             onClick = {
@@ -205,30 +214,31 @@ fun ProfileScreen(
                                 isKeySaved = false
                                 onKeyConfigChanged()
                             },
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(6.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = colors.surfaceVariant)
                         ) {
-                            Text("Reset", color = colors.onSurface)
+                            Text("Reset", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = colors.onSurface)
                         }
                     }
                 } else {
                     Text(
-                        "Missing API Key. Provide it to enable AI processing:",
-                        fontSize = 11.sp,
+                        "Missing API Key. Provide it to enable Gemini processing:",
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.error
                     )
 
                     OutlinedTextField(
                         value = apiKeyText,
                         onValueChange = { apiKeyText = it },
-                        placeholder = { Text("AIzaSy...", color = colors.onSurfaceVariant.copy(alpha = 0.5f)) },
+                        placeholder = { Text("AIzaSy...", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = colors.onSurfaceVariant.copy(alpha = 0.5f)) },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(8.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = colors.onSurface,
                             unfocusedTextColor = colors.onSurface,
                             focusedBorderColor = colors.accent,
-                            unfocusedBorderColor = colors.onSurfaceVariant.copy(alpha = 0.3f)
+                            unfocusedBorderColor = colors.surfaceBorder
                         ),
                         singleLine = true
                     )
@@ -243,50 +253,13 @@ fun ProfileScreen(
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = colors.accent)
                     ) {
-                        Text("Save key in Vault", color = Color.White)
+                        Text("Save key in Vault", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color.Black)
                     }
                 }
             }
         }
-
-        // 4. Options
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                ProfileOptionRow("Account Settings")
-                Divider(color = colors.onSurfaceVariant.copy(alpha = 0.08f))
-                ProfileOptionRow("Privacy Policy")
-                Divider(color = colors.onSurfaceVariant.copy(alpha = 0.08f))
-                ProfileOptionRow("Help & Support")
-                Divider(color = colors.onSurfaceVariant.copy(alpha = 0.08f))
-                ProfileOptionRow("About Jarvish")
-            }
-        }
-    }
-}
-
-@Composable
-fun ProfileOptionRow(title: String) {
-    val colors = LocalJarvisColors.current
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { /* action */ }
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.onSurface)
-        Text("➔", fontSize = 14.sp, color = colors.onSurfaceVariant)
     }
 }
