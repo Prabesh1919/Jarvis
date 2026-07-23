@@ -39,6 +39,7 @@ import com.jarvis.voice.SpeechState
 import com.jarvis.voice.SpeechToTextManager
 import com.jarvis.voice.TextToSpeechManager
 import com.jarvis.voice.TtsState
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -68,32 +69,24 @@ fun isNetworkConnected(context: Context): Boolean {
 /**
  * Smart LLM prompt executor:
  * 1. Tries configured Cloud LLM (Gemini 2.5 Flash / OpenRouter) first.
- * 2. If Cloud fails & local GGUF is available -> Failover to Local GGUF.
- * 3. If local GGUF is not downloaded -> Return helpful guidance instead of crashing.
+ * 2. If network drops or Cloud fails -> Automatically switches to Local Llama 3.2 GGUF engine.
  */
 suspend fun executeSmartLlmPrompt(context: Context, text: String): Pair<String, String> {
     val cloudModel = AppConfig.getLlmModel(context)
     
+    // Auto-provision default local GGUF container so offline mode is instantly ready
+    LocalLlmEngine.autoProvisionDefaultModel(context)
+
     try {
         val cloudResponse = LlmClient.generateContent(context, text)
         return Pair(cloudResponse, cloudModel)
     } catch (cloudErr: Exception) {
-        // Check if local GGUF model file is present
-        if (LocalLlmEngine.isOfflineModelAvailable(context)) {
-            try {
-                val localResponse = LocalLlmEngine.generate(context, text)
-                return Pair(localResponse, "LOCAL LLAMA 3.2 1B (OFFLINE GGUF)")
-            } catch (ggufErr: Exception) {
-                return Pair("[OFFLINE ERROR] GGUF Engine error: ${ggufErr.message}", "GGUF ERROR")
-            }
-        } else {
-            val isMissingKey = cloudErr.message?.contains("Gemini API Key is not configured") == true
-            val errorMsg = if (isMissingKey) {
-                "[CONFIG REQUIRED] Gemini API Key is missing. Please add your key in Vault Settings."
-            } else {
-                "[OFFLINE MODE] Could not reach online servers. To chat offline, please download a GGUF model in Vault Settings."
-            }
-            return Pair(errorMsg, "OFFLINE NOTICE")
+        // Automatic failover to Local Llama 3.2 GGUF engine
+        try {
+            val localResponse = LocalLlmEngine.generate(context, text)
+            return Pair(localResponse, "LOCAL LLAMA 3.2 1B (OFFLINE GGUF)")
+        } catch (ggufErr: Exception) {
+            return Pair("[OFFLINE ERROR] GGUF Engine: ${ggufErr.message}", "LOCAL LLAMA 3.2 1B (OFFLINE GGUF)")
         }
     }
 }
@@ -113,7 +106,26 @@ fun JarvisMainTerminalScreen(
     val listState = rememberLazyListState()
 
     var isOnline by remember { mutableStateOf(isNetworkConnected(context)) }
-    var activeModelDisplay by remember { mutableStateOf(AppConfig.getLlmModel(context)) }
+    var activeModelDisplay by remember {
+        mutableStateOf(
+            if (isOnline) AppConfig.getLlmModel(context) else "LOCAL LLAMA 3.2 1B (OFFLINE GGUF)"
+        )
+    }
+
+    // Automatic Real-Time Network & Offline GGUF Model Monitor
+    LaunchedEffect(Unit) {
+        LocalLlmEngine.autoProvisionDefaultModel(context)
+        while (true) {
+            val connected = isNetworkConnected(context)
+            isOnline = connected
+            activeModelDisplay = if (connected) {
+                AppConfig.getLlmModel(context)
+            } else {
+                "LOCAL LLAMA 3.2 1B (OFFLINE GGUF)"
+            }
+            delay(2500)
+        }
+    }
 
     // Chat message history
     val chatMessages = remember {
@@ -136,7 +148,7 @@ fun JarvisMainTerminalScreen(
         }
     }
 
-    // STT -> LLM -> TTS Pipeline with Smart Failover
+    // STT -> LLM -> Voice AI Pipeline with Automatic Offline Fallback
     LaunchedEffect(speechState) {
         if (speechState is SpeechState.Results) {
             val userText = speechState.text
@@ -172,7 +184,7 @@ fun JarvisMainTerminalScreen(
             .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 1. Top Status Header Bar
+        // 1. Top Status Header & Automatic Model Indicator Badge
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -333,8 +345,6 @@ fun JarvisMainTerminalScreen(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = colors.onSurface,
                         unfocusedTextColor = colors.onSurface,
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
                         focusedBorderColor = colors.accent,
                         unfocusedBorderColor = colors.surfaceBorder
                     )
