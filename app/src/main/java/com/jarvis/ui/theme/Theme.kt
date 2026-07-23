@@ -4,6 +4,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 
 enum class AppThemeType(val displayName: String) {
+    MARK_XXXIX_CYAN("Mark XXXIX Arc Cyan"),
     HACKER_CYBER("Hacker Cyber"),
     RED_MATRIX("Red Matrix"),
     BLUE_OCEAN("Blue Ocean"),
@@ -29,12 +30,27 @@ data class JarvisColors(
 )
 
 val LocalJarvisColors = staticCompositionLocalOf {
-    getColorsForTheme(AppThemeType.HACKER_CYBER, isDark = true)
+    getColorsForTheme(AppThemeType.MARK_XXXIX_CYAN, isDark = true)
 }
 
 fun getColorsForTheme(theme: AppThemeType, isDark: Boolean): JarvisColors {
     return if (isDark) {
         when (theme) {
+            AppThemeType.MARK_XXXIX_CYAN -> JarvisColors(
+                accent = Color(0xFF00D4FF),
+                secondaryGlow = Color(0xFFFF6B00),
+                background = Color(0xFF00060A),
+                surface = Color(0xFF010D14),
+                surfaceVariant = Color(0xFF010F18),
+                onBackground = Color(0xFF8FFCFF),
+                onSurface = Color(0xFF8FFCFF),
+                onSurfaceVariant = Color(0xFF3A8A9A),
+                isDark = true,
+                cardGradStart = Color(0xFF011520),
+                cardGradEnd = Color(0xFF00060A),
+                surfaceGlass = Color(0xFF010D14).copy(alpha = 0.65f),
+                surfaceBorder = Color(0xFF0D3347)
+            )
             AppThemeType.HACKER_CYBER -> JarvisColors(
                 accent = Color(0xFF00FF41),
                 secondaryGlow = Color(0xFF008000),

@@ -32,6 +32,7 @@ import com.jarvis.brain.LocalLlmEngine
 import com.jarvis.config.AppConfig
 import com.jarvis.context.DeviceContext
 import com.jarvis.safety.SafetyLayer
+import com.jarvis.ui.components.ArcReactorWidget
 import com.jarvis.ui.theme.JarvisColors
 import com.jarvis.ui.theme.LocalJarvisColors
 import com.jarvis.voice.GeminiVoiceEngine
@@ -259,9 +260,25 @@ fun JarvisMainTerminalScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
+        // 2. Iron Man Mark-XXXIX Arc Reactor Core HUD Widget (100% Desktop Identical)
+        val isListening = speechState is SpeechState.Listening
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(130.dp)
+                .padding(vertical = 4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            ArcReactorWidget(
+                modifier = Modifier.size(120.dp),
+                isListening = isListening,
+                isSpeaking = manualLoading || isProcessing
+            )
+        }
 
-        // 2. Full-Screen Chat Terminal Feed
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // 3. Full-Screen Chat Terminal Feed
         Card(
             modifier = Modifier
                 .fillMaxWidth()
