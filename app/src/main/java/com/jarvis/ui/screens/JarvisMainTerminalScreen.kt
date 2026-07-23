@@ -386,16 +386,35 @@ fun JarvisMainTerminalScreen(
 
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(44.dp)
                         .clip(CircleShape)
                         .background(micBg)
-                        .border(1.dp, colors.surfaceBorder, CircleShape)
+                        .border(1.5.dp, if (isListening) colors.accent else colors.surfaceBorder, CircleShape)
                         .pointerInput(Unit) {
                             detectTapGestures(
                                 onPress = {
+                                    // Walkie-Talkie: Immediately interrupt/stop any active AI speaker playback
+                                    GeminiVoiceEngine.stopPlayback()
+                                    com.jarvis.voice.LocalVoiceModel.stopPlayback()
+                                    if (ttsState is TtsState.Speaking) {
+                                        ttsManager.stopSpeaking()
+                                    }
+                                    
                                     sttManager.startListening()
-                                    tryAwaitRelease()
-                                    sttManager.stopListening()
+                                    val released = tryAwaitRelease()
+                                    if (released) {
+                                        sttManager.stopListening()
+                                    }
+                                },
+                                onTap = {
+                                    // 1-Tap Toggle support
+                                    if (isListening) {
+                                        sttManager.stopListening()
+                                    } else {
+                                        GeminiVoiceEngine.stopPlayback()
+                                        com.jarvis.voice.LocalVoiceModel.stopPlayback()
+                                        sttManager.startListening()
+                                    }
                                 }
                             )
                         },
@@ -403,7 +422,7 @@ fun JarvisMainTerminalScreen(
                 ) {
                     Text(
                         text = if (isListening) "🎙️" else "🎤",
-                        fontSize = 16.sp
+                        fontSize = 18.sp
                     )
                 }
             }
