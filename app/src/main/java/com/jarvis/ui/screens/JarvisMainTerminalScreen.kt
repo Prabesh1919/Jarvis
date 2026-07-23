@@ -108,18 +108,33 @@ fun JarvisMainTerminalScreen(
         )
     }
 
-    // Automatic Real-Time Network & Offline GGUF Model Monitor
-    LaunchedEffect(Unit) {
-        LocalLlmEngine.autoProvisionDefaultModel(context)
-        while (true) {
-            val connected = isNetworkConnected(context)
-            isOnline = connected
-            activeModelDisplay = if (connected) {
-                AppConfig.getLlmModel(context)
-            } else {
-                "LOCAL LLAMA 3.2 1B (OFFLINE GGUF)"
+    // Event-Driven Zero-Overhead Network & Offline Model Monitor
+    DisposableEffect(context) {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) {
+                isOnline = true
+                activeModelDisplay = AppConfig.getLlmModel(context)
             }
-            delay(2500)
+
+            override fun onLost(network: android.net.Network) {
+                isOnline = false
+                activeModelDisplay = "LOCAL LLAMA 3.2 1B (OFFLINE GGUF)"
+            }
+        }
+
+        try {
+            cm?.registerDefaultNetworkCallback(callback)
+        } catch (_: Exception) {}
+
+        coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            LocalLlmEngine.autoProvisionDefaultModel(context)
+        }
+
+        onDispose {
+            try {
+                cm?.unregisterNetworkCallback(callback)
+            } catch (_: Exception) {}
         }
     }
 
@@ -264,7 +279,7 @@ fun JarvisMainTerminalScreen(
                     .padding(10.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(chatMessages) { msg ->
+                items(chatMessages, key = { msg -> msg.timestamp }) { msg ->
                     ChatBubble(msg, colors)
                 }
             }
