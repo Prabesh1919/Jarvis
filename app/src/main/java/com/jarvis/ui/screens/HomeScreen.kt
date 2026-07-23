@@ -9,47 +9,94 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jarvis.brain.LlmClient
+import com.jarvis.config.AppConfig
 import com.jarvis.context.DeviceContext
-import com.jarvis.safety.PermissionManager
-import com.jarvis.safety.PermissionState
-import com.jarvis.safety.PermissionType
+import com.jarvis.ui.theme.JarvisColors
 import com.jarvis.ui.theme.LocalJarvisColors
 import com.jarvis.voice.SpeechState
 import com.jarvis.voice.SpeechToTextManager
 import com.jarvis.voice.TextToSpeechManager
 import com.jarvis.voice.TtsState
 import kotlinx.coroutines.launch
-import kotlin.math.sin
+
+data class ChatMessage(
+    val sender: String,
+    val text: String,
+    val isUser: Boolean,
+    val modelName: String = "Gemini 2.5 Flash",
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+@Composable
+fun ChatBubble(msg: ChatMessage, colors: JarvisColors) {
+    val isUser = msg.isUser
+    val align = if (isUser) Alignment.End else Alignment.Start
+    val bg = if (isUser) colors.surfaceVariant else colors.surfaceGlass
+    val borderCol = if (isUser) colors.accent else colors.surfaceBorder
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = align
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = msg.sender.uppercase(),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                color = if (isUser) colors.accent else colors.secondaryGlow
+            )
+            if (!isUser) {
+                Text(
+                    text = "[${msg.modelName}]",
+                    fontSize = 8.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = colors.accent.copy(alpha = 0.85f)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(2.dp))
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(bg)
+                .border(1.dp, borderCol, RoundedCornerShape(8.dp))
+                .padding(8.dp)
+        ) {
+            Text(
+                text = msg.text,
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                color = colors.onSurface
+            )
+        }
+    }
+}
 
 @Composable
 fun HomeScreen(
@@ -64,13 +111,15 @@ fun HomeScreen(
     val context = LocalContext.current
     val listState = rememberLazyListState()
 
+    val currentModel = remember(context) { AppConfig.getLlmModel(context) }
+
     // Expandable Telemetry Drawer State
     var isHudExpanded by remember { mutableStateOf(false) }
 
     // Chat message history
     val chatMessages = remember {
         mutableStateListOf(
-            ChatMessage("JARVISH", "[SYSTEM_READY] Desktop-Style AI Gateway active. Speak via the mic button or type a command.", false)
+            ChatMessage("JARVISH", "[SYSTEM_READY] Active Gateway: $currentModel. Type or speak below.", false, modelName = currentModel)
         )
     }
     var manualLoading by remember { mutableStateOf(false) }
@@ -97,11 +146,11 @@ fun HomeScreen(
                 chatMessages.add(ChatMessage("You", userText, true))
                 try {
                     val response = LlmClient.generateContent(context, userText)
-                    chatMessages.add(ChatMessage("JARVISH", response, false))
+                    chatMessages.add(ChatMessage("JARVISH", response, false, modelName = currentModel))
                     lastResponseText = response
                     ttsManager.speak(response)
                 } catch (e: Exception) {
-                    chatMessages.add(ChatMessage("JARVISH", "[ERROR] ${e.message}", false))
+                    chatMessages.add(ChatMessage("JARVISH", "[ERROR] ${e.message}", false, modelName = currentModel))
                 } finally {
                     isProcessing = false
                     sttManager.resetState()
@@ -116,16 +165,6 @@ fun HomeScreen(
 
     // Animations
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val phase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 2 * Math.PI.toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "phase"
-    )
-
     val dialAngle by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
@@ -142,7 +181,7 @@ fun HomeScreen(
             .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 1. Top Compact Header & Telemetry Drawer Toggle
+        // 1. Top Compact Header & Active LLM Model Indicator Badge
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -166,22 +205,30 @@ fun HomeScreen(
                             .clip(CircleShape)
                             .background(colors.accent)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        "[ROOT@JARVISH ~]# ONLINE",
-                        fontSize = 11.sp,
+                        "[ONLINE]",
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace,
                         color = colors.accent
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "[MODEL: ${currentModel.uppercase()}]",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        color = colors.secondaryGlow
                     )
                 }
 
                 TextButton(
                     onClick = { isHudExpanded = !isHudExpanded },
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        if (isHudExpanded) "[ ▲ HIDE HUD ]" else "[ ▼ SHOW HUD ]",
+                        if (isHudExpanded) "[ ▲ HUD ]" else "[ ▼ HUD ]",
                         fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace,
                         color = colors.onSurfaceVariant
@@ -203,10 +250,9 @@ fun HomeScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Central Dial
                 Box(
                     modifier = Modifier
-                        .size(160.dp)
+                        .size(140.dp)
                         .background(
                             Brush.radialGradient(
                                 colors = listOf(colors.accent.copy(alpha = 0.08f), Color.Transparent)
@@ -255,7 +301,7 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // 3. Desktop-Style Chatbot Terminal Messages Area (Fills available screen space)
+        // 3. Desktop-Style Chatbot Terminal Messages Area (Displays Active LLM Model on Each Bubble)
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -312,7 +358,7 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // 5. Desktop-Style Interactive Input & Push-to-Talk Command Bar
+        // 5. Desktop-Style Interactive Input Bar
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -329,7 +375,6 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Text Input Prompt
                 OutlinedTextField(
                     value = manualText,
                     onValueChange = { manualText = it },
@@ -349,6 +394,8 @@ fun HomeScreen(
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = colors.onSurface,
+                        unfocusedTextColor = colors.onSurface,
                         focusedContainerColor = Color.Transparent,
                         unfocusedContainerColor = Color.Transparent,
                         focusedBorderColor = colors.accent,
@@ -356,7 +403,6 @@ fun HomeScreen(
                     )
                 )
 
-                // Send Button
                 Button(
                     onClick = {
                         val text = manualText.trim()
@@ -367,11 +413,11 @@ fun HomeScreen(
                         coroutineScope.launch {
                             try {
                                 val response = LlmClient.generateContent(context, text)
-                                chatMessages.add(ChatMessage("JARVISH", response, false))
+                                chatMessages.add(ChatMessage("JARVISH", response, false, modelName = currentModel))
                                 lastResponseText = response
                                 ttsManager.speak(response)
                             } catch (e: Exception) {
-                                chatMessages.add(ChatMessage("JARVISH", "[ERROR] ${e.message}", false))
+                                chatMessages.add(ChatMessage("JARVISH", "[ERROR] ${e.message}", false, modelName = currentModel))
                             } finally {
                                 manualLoading = false
                             }
@@ -390,7 +436,6 @@ fun HomeScreen(
                     )
                 }
 
-                // Push-to-Talk Mic Button
                 val isListening = speechState is SpeechState.Listening
                 val micBg = if (isListening) colors.accent else colors.surfaceVariant
 
