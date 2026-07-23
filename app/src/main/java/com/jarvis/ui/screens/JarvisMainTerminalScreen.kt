@@ -386,16 +386,18 @@ fun JarvisMainTerminalScreen(
 
                 IconButton(
                     onClick = {
-                        if (isListening) {
-                            sttManager.stopListening()
-                        } else {
-                            // Interrupt any active voice playback immediately
-                            GeminiVoiceEngine.stopPlayback()
-                            com.jarvis.voice.LocalVoiceModel.stopPlayback()
-                            if (ttsState is TtsState.Speaking) {
-                                ttsManager.stopSpeaking()
+                        coroutineScope.launch {
+                            if (isListening) {
+                                sttManager.stopListening()
+                            } else {
+                                // Interrupt any active voice playback immediately
+                                GeminiVoiceEngine.stopPlayback()
+                                com.jarvis.voice.LocalVoiceModel.stopPlayback()
+                                if (ttsState is TtsState.Speaking) {
+                                    ttsManager.stopSpeaking()
+                                }
+                                sttManager.startListening()
                             }
-                            sttManager.startListening()
                         }
                     },
                     modifier = Modifier
