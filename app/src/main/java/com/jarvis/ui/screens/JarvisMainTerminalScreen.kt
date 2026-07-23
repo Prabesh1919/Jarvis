@@ -190,6 +190,17 @@ fun JarvisMainTerminalScreen(
         }
     }
 
+    val infiniteAnim = rememberInfiniteTransition(label = "StatusBeacon")
+    val beaconAlpha by infiniteAnim.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "beaconAlpha"
+    )
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -201,7 +212,11 @@ fun JarvisMainTerminalScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
-                .background(colors.surfaceGlass)
+                .background(
+                    androidx.compose.ui.graphics.Brush.horizontalGradient(
+                        colors = listOf(colors.cardGradStart.copy(alpha = 0.85f), colors.cardGradEnd.copy(alpha = 0.9f))
+                    )
+                )
                 .border(1.dp, colors.surfaceBorder, RoundedCornerShape(12.dp)),
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = Color.Transparent)
@@ -218,11 +233,13 @@ fun JarvisMainTerminalScreen(
                         modifier = Modifier
                             .size(8.dp)
                             .clip(CircleShape)
-                            .background(if (isOnline) colors.accent else Color.Yellow)
+                            .background(
+                                (if (isOnline) colors.accent else Color.Yellow).copy(alpha = beaconAlpha)
+                            )
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        if (isOnline) "[ONLINE]" else "[OFFLINE]",
+                        if (isOnline) "● ONLINE" else "● OFFLINE",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace,

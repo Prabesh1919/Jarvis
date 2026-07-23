@@ -53,46 +53,93 @@ data class ChatMessage(
 fun ChatBubble(msg: ChatMessage, colors: JarvisColors) {
     val isUser = msg.isUser
     val align = if (isUser) Alignment.End else Alignment.Start
-    val bg = if (isUser) colors.surfaceVariant else colors.surfaceGlass
-    val borderCol = if (isUser) colors.accent else colors.surfaceBorder
+    
+    val bubbleGrad = if (isUser) {
+        Brush.linearGradient(
+            colors = listOf(
+                colors.accent.copy(alpha = 0.22f),
+                colors.surfaceVariant.copy(alpha = 0.85f)
+            )
+        )
+    } else {
+        Brush.linearGradient(
+            colors = listOf(
+                colors.cardGradStart.copy(alpha = 0.9f),
+                colors.cardGradEnd.copy(alpha = 0.95f)
+            )
+        )
+    }
+    
+    val borderCol = if (isUser) colors.accent.copy(alpha = 0.6f) else colors.surfaceBorder.copy(alpha = 0.8f)
 
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
         horizontalAlignment = align
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
         ) {
             Text(
-                text = msg.sender.uppercase(),
+                text = if (isUser) "▶ OPERATOR" else "⚡ JARVISH",
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
                 color = if (isUser) colors.accent else colors.secondaryGlow
             )
             if (!isUser) {
-                Text(
-                    text = "[${msg.modelName}]",
-                    fontSize = 8.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = colors.accent.copy(alpha = 0.85f)
-                )
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = colors.accent.copy(alpha = 0.15f),
+                    border = androidx.compose.foundation.BorderStroke(0.5.dp, colors.accent.copy(alpha = 0.4f))
+                ) {
+                    Text(
+                        text = msg.modelName.uppercase(),
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        color = colors.accent,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                    )
+                }
             }
         }
+        
         Spacer(modifier = Modifier.height(2.dp))
+
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background(bg)
-                .border(1.dp, borderCol, RoundedCornerShape(8.dp))
-                .padding(8.dp)
+                .widthIn(max = 310.dp)
+                .clip(
+                    RoundedCornerShape(
+                        topStart = 12.dp,
+                        topEnd = 12.dp,
+                        bottomStart = if (isUser) 12.dp else 2.dp,
+                        bottomEnd = if (isUser) 2.dp else 12.dp
+                    )
+                )
+                .background(bubbleGrad)
+                .border(
+                    width = 1.dp,
+                    color = borderCol,
+                    shape = RoundedCornerShape(
+                        topStart = 12.dp,
+                        topEnd = 12.dp,
+                        bottomStart = if (isUser) 12.dp else 2.dp,
+                        bottomEnd = if (isUser) 2.dp else 12.dp
+                    )
+                )
+                .padding(horizontal = 12.dp, vertical = 10.dp)
         ) {
             Text(
                 text = msg.text,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace,
-                color = colors.onSurface
+                color = colors.onSurface,
+                lineHeight = 16.sp
             )
         }
     }
