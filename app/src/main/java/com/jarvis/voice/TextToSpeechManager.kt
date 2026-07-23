@@ -29,7 +29,9 @@ sealed class TtsState {
  */
 class TextToSpeechManager(private val context: Context) : TextToSpeech.OnInitListener {
 
-    private const val TAG = "TextToSpeechManager"
+    companion object {
+        private const val TAG = "TextToSpeechManager"
+    }
 
     private val _ttsState = MutableStateFlow<TtsState>(TtsState.Initializing)
     val ttsState: StateFlow<TtsState> = _ttsState.asStateFlow()
