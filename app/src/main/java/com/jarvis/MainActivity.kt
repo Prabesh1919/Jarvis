@@ -7,7 +7,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -16,12 +15,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.jarvis.config.AppConfig
 import com.jarvis.context.ContextEngine
-import com.jarvis.context.DeviceContext
 import com.jarvis.safety.*
 import com.jarvis.ui.screens.*
 import com.jarvis.ui.theme.*
@@ -35,7 +33,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Bind permission manager
         PermissionManager.register(this)
 
         sttManager = SpeechToTextManager(this)
@@ -83,125 +80,82 @@ fun JarvisAppContent(
     val context = LocalContext.current
     val colors = LocalJarvisColors.current
 
-    // Navigation and screen routing
-    var selectedTab by remember { mutableIntStateOf(0) } // 0: Home, 1: Control, 2: Tools, 3: Files, 4: Profile
-    var currentSubscreen by remember { mutableStateOf<String?>(null) } // "OptimizerScreen", "PerformanceScreen", "SecurityScreen", etc.
+    // Navigation state: 0 -> Terminal, 1 -> Vault & Settings
+    var selectedScreen by remember { mutableIntStateOf(0) }
+    var currentSubscreen by remember { mutableStateOf<String?>(null) }
 
-    // System Monitor flows
     val deviceContext by ContextEngine.deviceContext.collectAsState()
     val isAutomationAllowed by SafetyLayer.isAutomationAllowed.collectAsState()
-
-    // Permission flows
-    val micPermState by PermissionManager.microphoneState.collectAsState()
-    val notifPermState by PermissionManager.notificationsState.collectAsState()
-    val usagePermState by PermissionManager.usageStatsState.collectAsState()
-
-    // Speech states
     val speechState by sttManager.speechState.collectAsState()
 
-    // Rationale dialog states
     var showRationaleDialog by remember { mutableStateOf(false) }
     var activePermissionType by remember { mutableStateOf(PermissionType.MICROPHONE) }
     var isPermDeniedPermanent by remember { mutableStateOf(false) }
 
-    fun triggerPermissionRequest(type: PermissionType, state: PermissionState) {
-        if (state is PermissionState.PermanentlyDenied) {
-            activePermissionType = type
-            isPermDeniedPermanent = true
-            showRationaleDialog = true
-        } else if (state is PermissionState.Denied) {
-            activePermissionType = type
-            isPermDeniedPermanent = false
-            showRationaleDialog = true
-        } else {
-            onRequestPermission(type)
-        }
-    }
-
     Scaffold(
         topBar = {
-            // Floating Glass Top Bar
+            // Floating 2-Screen Segmented Switcher Top Bar
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .clip(RoundedCornerShape(24.dp))
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .clip(RoundedCornerShape(20.dp))
                     .background(colors.surfaceGlass)
-                    .border(1.dp, colors.surfaceBorder, RoundedCornerShape(24.dp))
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .border(1.dp, colors.surfaceBorder, RoundedCornerShape(20.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
-                Text(
-                    text = "JARVISH",
-                    fontWeight = FontWeight.Black,
-                    fontSize = 18.sp,
-                    letterSpacing = 3.sp,
-                    color = colors.onSurface,
-                    modifier = Modifier.align(Alignment.Center)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "JARVISH AI",
+                        fontWeight = FontWeight.Black,
+                        fontSize = 15.sp,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 2.sp,
+                        color = colors.accent
+                    )
 
-                IconButton(
-                    onClick = { onDarkToggle(!isDark) },
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .size(32.dp)
-                ) {
-                    Text(if (isDark) "☀️" else "🌙", fontSize = 16.sp)
-                }
-            }
-        },
-        bottomBar = {
-            if (currentSubscreen == null) {
-                // Floating Glass Dock
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 16.dp)
-                        .navigationBarsPadding() // Ensures it sits above system nav
-                ) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(32.dp))
-                            .background(colors.surfaceGlass)
-                            .border(1.dp, colors.surfaceBorder, RoundedCornerShape(32.dp))
-                            .padding(horizontal = 8.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val tabs = listOf(
-                            TabItem("Home", "🏠", 0),
-                            TabItem("Control", "🎛️", 1),
-                            TabItem("Tools", "🛠️", 2),
-                            TabItem("Files", "📂", 3),
-                            TabItem("Profile", "👤", 4)
-                        )
+                        // Terminal Tab Button
+                        Button(
+                            onClick = { selectedScreen = 0; currentSubscreen = null },
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (selectedScreen == 0) colors.accent else Color.Transparent
+                            )
+                        ) {
+                            Text(
+                                "TERMINAL",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                color = if (selectedScreen == 0) Color.Black else colors.onSurface
+                            )
+                        }
 
-                        tabs.forEach { tab ->
-                            val isSelected = selectedTab == tab.index
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(if (isSelected) colors.surfaceVariant.copy(alpha = 0.5f) else Color.Transparent)
-                                    .clickable { selectedTab = tab.index }
-                                    .padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        text = tab.icon,
-                                        fontSize = if (isSelected) 22.sp else 18.sp,
-                                        modifier = Modifier.padding(bottom = 2.dp)
-                                    )
-                                    // Animated indicator dot
-                                    Box(
-                                        modifier = Modifier
-                                            .size(4.dp)
-                                            .clip(CircleShape)
-                                            .background(if (isSelected) colors.accent else Color.Transparent)
-                                    )
-                                }
-                            }
+                        // Vault & Settings Tab Button
+                        Button(
+                            onClick = { selectedScreen = 1; currentSubscreen = null },
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (selectedScreen == 1) colors.accent else Color.Transparent
+                            )
+                        ) {
+                            Text(
+                                "VAULT",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                color = if (selectedScreen == 1) Color.Black else colors.onSurface
+                            )
                         }
                     }
                 }
@@ -214,7 +168,6 @@ fun JarvisAppContent(
                 .padding(paddingValues)
                 .background(colors.background)
         ) {
-            // Priority Subscreen Routing
             if (currentSubscreen != null) {
                 when (currentSubscreen) {
                     "OptimizerScreen" -> OptimizerScreen(onBack = { currentSubscreen = null })
@@ -230,40 +183,35 @@ fun JarvisAppContent(
                     )
                 }
             } else {
-                // Tab Routing
-                when (selectedTab) {
-                    0 -> HomeScreen(
+                when (selectedScreen) {
+                    0 -> JarvisMainTerminalScreen(
                         deviceContext = deviceContext,
                         speechState = speechState,
                         sttManager = sttManager,
                         ttsManager = ttsManager,
+                        onOpenVaultSettings = { selectedScreen = 1 },
                         onQuickActionClick = { action ->
                             when (action) {
-                                "Junk Cleaner" -> currentSubscreen = "OptimizerScreen"
-                                "Memory Boost" -> currentSubscreen = "PerformanceScreen"
-                                "Battery Saver" -> currentSubscreen = "BatterySaverScreen"
-                                "Full Scan" -> currentSubscreen = "SecurityScreen"
+                                "Query Docs" -> currentSubscreen = "RagSearchScreen"
+                                "Launch App" -> currentSubscreen = "AutomationScreen"
+                                "System Status" -> currentSubscreen = "PerformanceScreen"
+                                "Offline GGUF" -> selectedScreen = 1
                             }
                         }
                     )
-                    1 -> ControlScreen()
-                    2 -> ToolsScreen(onToolSelect = { dest -> currentSubscreen = dest })
-                    3 -> FilesScreen()
-                    4 -> ProfileScreen(
+                    1 -> JarvisVaultSettingsScreen(
                         currentTheme = currentTheme,
                         isDark = isDark,
                         onThemeChange = onThemeChange,
                         onDarkToggle = onDarkToggle,
-                        onKeyConfigChanged = {
-                            // Reset key states or reload configuration
-                        }
+                        onKeyConfigChanged = {},
+                        onBackToTerminal = { selectedScreen = 0 }
                     )
                 }
             }
         }
     }
 
-    // Modal Rationale Dialog for permissions
     if (showRationaleDialog) {
         PermissionRationaleDialog(
             showDialog = showRationaleDialog,
@@ -281,5 +229,3 @@ fun JarvisAppContent(
         )
     }
 }
-
-data class TabItem(val label: String, val icon: String, val index: Int)
