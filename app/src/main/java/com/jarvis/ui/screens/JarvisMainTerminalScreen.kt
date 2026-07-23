@@ -384,41 +384,25 @@ fun JarvisMainTerminalScreen(
                 val isListening = speechState is SpeechState.Listening
                 val micBg = if (isListening) colors.accent else colors.surfaceVariant
 
-                Box(
+                IconButton(
+                    onClick = {
+                        if (isListening) {
+                            sttManager.stopListening()
+                        } else {
+                            // Interrupt any active voice playback immediately
+                            GeminiVoiceEngine.stopPlayback()
+                            com.jarvis.voice.LocalVoiceModel.stopPlayback()
+                            if (ttsState is TtsState.Speaking) {
+                                ttsManager.stopSpeaking()
+                            }
+                            sttManager.startListening()
+                        }
+                    },
                     modifier = Modifier
                         .size(44.dp)
                         .clip(CircleShape)
                         .background(micBg)
                         .border(1.5.dp, if (isListening) colors.accent else colors.surfaceBorder, CircleShape)
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onPress = {
-                                    // Walkie-Talkie: Immediately interrupt/stop any active AI speaker playback
-                                    GeminiVoiceEngine.stopPlayback()
-                                    com.jarvis.voice.LocalVoiceModel.stopPlayback()
-                                    if (ttsState is TtsState.Speaking) {
-                                        ttsManager.stopSpeaking()
-                                    }
-                                    
-                                    sttManager.startListening()
-                                    val released = tryAwaitRelease()
-                                    if (released) {
-                                        sttManager.stopListening()
-                                    }
-                                },
-                                onTap = {
-                                    // 1-Tap Toggle support
-                                    if (isListening) {
-                                        sttManager.stopListening()
-                                    } else {
-                                        GeminiVoiceEngine.stopPlayback()
-                                        com.jarvis.voice.LocalVoiceModel.stopPlayback()
-                                        sttManager.startListening()
-                                    }
-                                }
-                            )
-                        },
-                    contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = if (isListening) "🎙️" else "🎤",
