@@ -1,11 +1,10 @@
 package com.jarvis.ui.screens
 
+import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.content.Context
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,12 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -50,7 +44,98 @@ fun isNetworkConnected(context: Context): Boolean {
     val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
     val net = cm.activeNetwork ?: return false
     val caps = cm.getNetworkCapabilities(net) ?: return false
-    return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) ||
+           caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+}
+
+/**
+ * Smart LLM prompt executor:
+ * 1. Tries configured Cloud LLM (Gemini 2.5 Flash / OpenRouter) first.
+ * 2. If Cloud fails & local GGUF is available -> Failover to Local GGUF.
+ * 3. If local GGUF is not downloaded -> Return helpful guidance instead of crashing.
+ */
+suspend fun executeSmartLlmPrompt(context: Context, text: String): Pair<String, String> {
+    val cloudModel = AppConfig.getLlmModel(context)
+    
+    try {
+        val cloudResponse = LlmClient.generateContent(context, text)
+        return Pair(cloudResponse, cloudModel)
+    } catch (cloudErr: Exception) {
+        // Check if local GGUF model file is present
+        if (LocalLlmEngine.isOfflineModelAvailable(context)) {
+            try {
+                val localResponse = LocalLlmEngine.generate(context, text)
+                return Pair(localResponse, "LOCAL LLAMA 3.2 1B (OFFLINE GGUF)")
+            } catch (ggufErr: Exception) {
+                return Pair("[OFFLINE ERROR] GGUF Engine error: ${ggufErr.message}", "GGUF ERROR")
+            }
+        } else {
+            val isMissingKey = cloudErr.message?.contains("Gemini API Key is not configured") == true
+            val errorMsg = if (isMissingKey) {
+                "[CONFIG REQUIRED] Gemini API Key is missing. Please add your key in Vault Settings."
+            } else {
+                "[OFFLINE MODE] Could not reach online servers. To chat offline, please download a GGUF model in Vault Settings."
+            }
+            return Pair(errorMsg, "OFFLINE NOTICE")
+        }
+    }
+}
+
+data class ChatMessage(
+    val sender: String,
+    val text: String,
+    val isUser: Boolean,
+    val modelName: String = "Gemini 2.5 Flash",
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+@Composable
+fun ChatBubble(msg: ChatMessage, colors: JarvisColors) {
+    val isUser = msg.isUser
+    val align = if (isUser) Alignment.End else Alignment.Start
+    val bg = if (isUser) colors.surfaceVariant else colors.surfaceGlass
+    val borderCol = if (isUser) colors.accent else colors.surfaceBorder
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = align
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = msg.sender.uppercase(),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                color = if (isUser) colors.accent else colors.secondaryGlow
+            )
+            if (!isUser) {
+                Text(
+                    text = "[${msg.modelName}]",
+                    fontSize = 8.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = colors.accent.copy(alpha = 0.85f)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(2.dp))
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(bg)
+                .border(1.dp, borderCol, RoundedCornerShape(8.dp))
+                .padding(8.dp)
+        ) {
+            Text(
+                text = msg.text,
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                color = colors.onSurface
+            )
+        }
+    }
 }
 
 @Composable
@@ -67,25 +152,13 @@ fun JarvisMainTerminalScreen(
     val context = LocalContext.current
     val listState = rememberLazyListState()
 
-    // Automatic Offline Network & Model Switcher State
     var isOnline by remember { mutableStateOf(isNetworkConnected(context)) }
-    
-    // Periodically re-check network state
-    LaunchedEffect(Unit) {
-        while (true) {
-            isOnline = isNetworkConnected(context)
-            kotlinx.coroutines.delay(3000)
-        }
-    }
-
-    val activeModelName = remember(isOnline) {
-        if (isOnline) AppConfig.getLlmModel(context) else "LOCAL LLAMA 3.2 1B (OFFLINE GGUF)"
-    }
+    var activeModelDisplay by remember { mutableStateOf(AppConfig.getLlmModel(context)) }
 
     // Chat message history
     val chatMessages = remember {
         mutableStateListOf(
-            ChatMessage("JARVISH", "[SYSTEM_READY] Gateway: $activeModelName. Type or speak below.", false, modelName = activeModelName)
+            ChatMessage("JARVISH", "[SYSTEM_READY] Gateway active. Type or speak below.", false, modelName = activeModelDisplay)
         )
     }
     var manualLoading by remember { mutableStateOf(false) }
@@ -103,7 +176,7 @@ fun JarvisMainTerminalScreen(
         }
     }
 
-    // STT -> LLM -> TTS Pipeline with Automatic Offline Fallback
+    // STT -> LLM -> TTS Pipeline with Smart Failover
     LaunchedEffect(speechState) {
         if (speechState is SpeechState.Results) {
             val userText = speechState.text
@@ -112,16 +185,14 @@ fun JarvisMainTerminalScreen(
                 lastResponseText = null
                 chatMessages.add(ChatMessage("You", userText, true))
                 try {
-                    val response = if (isOnline) {
-                        LlmClient.generateContent(context, userText)
-                    } else {
-                        LocalLlmEngine.generate(context, userText)
-                    }
-                    chatMessages.add(ChatMessage("JARVISH", response, false, modelName = activeModelName))
+                    val (response, usedModel) = executeSmartLlmPrompt(context, userText)
+                    activeModelDisplay = usedModel
+                    isOnline = !usedModel.contains("OFFLINE")
+                    chatMessages.add(ChatMessage("JARVISH", response, false, modelName = usedModel))
                     lastResponseText = response
                     ttsManager.speak(response)
                 } catch (e: Exception) {
-                    chatMessages.add(ChatMessage("JARVISH", "[ERROR] ${e.message}", false, modelName = activeModelName))
+                    chatMessages.add(ChatMessage("JARVISH", "[ERROR] ${e.message}", false, modelName = activeModelDisplay))
                 } finally {
                     isProcessing = false
                     sttManager.resetState()
@@ -140,7 +211,7 @@ fun JarvisMainTerminalScreen(
             .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 1. Top Status Header & Automatic Model Indicator Badge
+        // 1. Top Status Header Bar
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -174,7 +245,7 @@ fun JarvisMainTerminalScreen(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        "[MODEL: ${activeModelName.uppercase()}]",
+                        "[MODEL: ${activeModelDisplay.uppercase()}]",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace,
@@ -237,7 +308,7 @@ fun JarvisMainTerminalScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            val chips = listOf("Query Docs", "Launch App", "System Status", "Offline GGUF")
+            val chips = listOf("Query Docs", "Launch App", "System Status")
             chips.forEach { chipText ->
                 SuggestionChip(
                     onClick = { onQuickActionClick(chipText) },
@@ -317,16 +388,14 @@ fun JarvisMainTerminalScreen(
                         manualLoading = true
                         coroutineScope.launch {
                             try {
-                                val response = if (isOnline) {
-                                    LlmClient.generateContent(context, text)
-                                } else {
-                                    LocalLlmEngine.generate(context, text)
-                                }
-                                chatMessages.add(ChatMessage("JARVISH", response, false, modelName = activeModelName))
+                                val (response, usedModel) = executeSmartLlmPrompt(context, text)
+                                activeModelDisplay = usedModel
+                                isOnline = !usedModel.contains("OFFLINE")
+                                chatMessages.add(ChatMessage("JARVISH", response, false, modelName = usedModel))
                                 lastResponseText = response
                                 ttsManager.speak(response)
                             } catch (e: Exception) {
-                                chatMessages.add(ChatMessage("JARVISH", "[ERROR] ${e.message}", false, modelName = activeModelName))
+                                chatMessages.add(ChatMessage("JARVISH", "[ERROR] ${e.message}", false, modelName = activeModelDisplay))
                             } finally {
                                 manualLoading = false
                             }
