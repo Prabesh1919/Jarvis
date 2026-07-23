@@ -48,15 +48,52 @@ class TextToSpeechManager(private val context: Context) : TextToSpeech.OnInitLis
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            val result = tts?.setLanguage(Locale.getDefault())
+            val result = tts?.setLanguage(Locale.UK) ?: tts?.setLanguage(Locale.US)
             if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                 _ttsState.value = TtsState.Error("Default Language is not supported on this TTS engine.")
             } else {
+                configureJarvisMaleVoice()
                 _ttsState.value = TtsState.Ready
                 setupProgressListener()
             }
         } else {
             _ttsState.value = TtsState.Error("Failed to initialize TextToSpeech engine.")
+        }
+    }
+
+    /**
+     * Configures pitch, speech rate, and selects a deep British/US Male voice matching JARVIS on Desktop.
+     */
+    private fun configureJarvisMaleVoice() {
+        val ttsEngine = tts ?: return
+
+        // Lower pitch (0.88f) for deep JARVIS resonance
+        ttsEngine.setPitch(0.88f)
+        // Crisp assistant speech speed (1.05f)
+        ttsEngine.setSpeechRate(1.05f)
+
+        try {
+            val availableVoices = ttsEngine.voices
+            if (!availableVoices.isNullOrEmpty()) {
+                val maleVoice = availableVoices.firstOrNull { voice ->
+                    val name = voice.name.lowercase(Locale.ROOT)
+                    val lang = voice.locale.language.lowercase(Locale.ROOT)
+                    val country = voice.locale.country.lowercase(Locale.ROOT)
+
+                    (name.contains("male") || name.contains("rsk") || name.contains("gbb") || name.contains("iom")) &&
+                    (lang == "en" && (country == "gb" || country == "us" || country == ""))
+                } ?: availableVoices.firstOrNull { voice ->
+                    voice.locale.language == "en" && voice.locale.country == "GB"
+                } ?: availableVoices.firstOrNull { voice ->
+                    voice.name.contains("male", ignoreCase = true)
+                }
+
+                if (maleVoice != null) {
+                    ttsEngine.voice = maleVoice
+                }
+            }
+        } catch (e: Exception) {
+            // Fallback to pitch tuning
         }
     }
 
