@@ -345,7 +345,7 @@ fun HomeScreen(
                         )
                     },
                     modifier = Modifier.height(26.dp),
-                    colors = SuggestionChipDefaults.suggestionChipColor(
+                    colors = SuggestionChipDefaults.suggestionChipColors(
                         containerColor = colors.surfaceVariant.copy(alpha = 0.4f)
                     ),
                     border = SuggestionChipDefaults.suggestionChipBorder(
