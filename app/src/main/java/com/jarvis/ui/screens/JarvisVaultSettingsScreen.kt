@@ -24,6 +24,7 @@ import com.jarvis.bridge.DesktopBridgeService
 import com.jarvis.config.AppConfig
 import com.jarvis.ui.theme.AppThemeType
 import com.jarvis.ui.theme.LocalJarvisColors
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,12 +38,15 @@ fun JarvisVaultSettingsScreen(
 ) {
     val colors = LocalJarvisColors.current
     val scrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
     var apiKeyText by remember { mutableStateOf("") }
     var desktopIpText by remember { mutableStateOf("192.168.1.100") }
     var isKeySaved by remember { mutableStateOf(AppConfig.isApiKeyConfigured(context)) }
-    val isGgufAvailable = remember(context) { LocalLlmEngine.isOfflineModelAvailable(context) }
+    var isGgufAvailable by remember { mutableStateOf(LocalLlmEngine.isOfflineModelAvailable(context)) }
+    var downloadStatusText by remember { mutableStateOf<String?>(null) }
+    var isDownloading by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -233,26 +237,54 @@ fun JarvisVaultSettingsScreen(
                     color = colors.onSurfaceVariant
                 )
 
-                Row(
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        if (isGgufAvailable) "GGUF Engine: ACTIVE" else "GGUF Engine: NOT PROVISIONED",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        color = if (isGgufAvailable) colors.accent else Color.Yellow
+                    )
+                    Text(
+                        "Auto-switches offline prompts to local Llama 3.2 GGUF",
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = colors.onSurfaceVariant
+                    )
+                }
+
+                if (downloadStatusText != null) {
+                    Text(
+                        downloadStatusText!!,
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = colors.accent
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            isDownloading = true
+                            downloadStatusText = "Provisioning local GGUF model container..."
+                            LocalLlmEngine.autoProvisionDefaultModel(context)
+                            val ok = LocalLlmEngine.initialize(context)
+                            isGgufAvailable = ok
+                            isDownloading = false
+                            downloadStatusText = if (ok) "✅ Offline GGUF Model Ready (Llama-3.2-1B-Instruct)" else "❌ GGUF setup failed."
+                        }
+                    },
+                    enabled = !isDownloading,
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.accent)
                 ) {
-                    Column {
-                        Text(
-                            if (isGgufAvailable) "GGUF Model: Loaded" else "GGUF Model: Not Found",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            color = if (isGgufAvailable) colors.accent else Color.Yellow
-                        )
-                        Text(
-                            "Auto-switches offline prompts to local Llama 3.2 GGUF",
-                            fontSize = 9.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = colors.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        if (isDownloading) "PROVISIONING..." else "⚡ INITIALIZE OFFLINE GGUF MODEL",
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = Color.Black
+                    )
                 }
             }
         }
