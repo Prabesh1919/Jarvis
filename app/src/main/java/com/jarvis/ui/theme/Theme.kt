@@ -145,6 +145,21 @@ fun getColorsForTheme(theme: AppThemeType, isDark: Boolean): JarvisColors {
     } else {
         // Light Mode equivalents (futuristic glossy, but light background)
         when (theme) {
+            AppThemeType.MARK_XXXIX_CYAN -> JarvisColors(
+                accent = Color(0xFF0099CC),
+                secondaryGlow = Color(0xFFE65100),
+                background = Color(0xFFF0F8FF),
+                surface = Color(0xFFFFFFFF),
+                surfaceVariant = Color(0xFFE1F5FE),
+                onBackground = Color(0xFF002171),
+                onSurface = Color(0xFF002171),
+                onSurfaceVariant = Color(0xFF005b9f),
+                isDark = false,
+                cardGradStart = Color(0xFFE1F5FE),
+                cardGradEnd = Color(0xFFF0F8FF),
+                surfaceGlass = Color(0xFFFFFFFF).copy(alpha = 0.7f),
+                surfaceBorder = Color(0xFF0099CC).copy(alpha = 0.3f)
+            )
             AppThemeType.HACKER_CYBER -> JarvisColors(
                 accent = Color(0xFF00C853),
                 secondaryGlow = Color(0xFF69F0AE),
