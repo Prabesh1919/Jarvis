@@ -81,63 +81,6 @@ suspend fun executeSmartLlmPrompt(context: Context, text: String): Pair<String, 
     }
 }
 
-data class ChatMessage(
-    val sender: String,
-    val text: String,
-    val isUser: Boolean,
-    val modelName: String = "Gemini 2.5 Flash",
-    val timestamp: Long = System.currentTimeMillis()
-)
-
-@Composable
-fun ChatBubble(msg: ChatMessage, colors: JarvisColors) {
-    val isUser = msg.isUser
-    val align = if (isUser) Alignment.End else Alignment.Start
-    val bg = if (isUser) colors.surfaceVariant else colors.surfaceGlass
-    val borderCol = if (isUser) colors.accent else colors.surfaceBorder
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = align
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(
-                text = msg.sender.uppercase(),
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                color = if (isUser) colors.accent else colors.secondaryGlow
-            )
-            if (!isUser) {
-                Text(
-                    text = "[${msg.modelName}]",
-                    fontSize = 8.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = colors.accent.copy(alpha = 0.85f)
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(2.dp))
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background(bg)
-                .border(1.dp, borderCol, RoundedCornerShape(8.dp))
-                .padding(8.dp)
-        ) {
-            Text(
-                text = msg.text,
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace,
-                color = colors.onSurface
-            )
-        }
-    }
-}
-
 @Composable
 fun JarvisMainTerminalScreen(
     deviceContext: DeviceContext,
