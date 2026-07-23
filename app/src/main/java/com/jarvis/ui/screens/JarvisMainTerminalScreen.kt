@@ -53,10 +53,18 @@ import kotlinx.coroutines.launch
  * 1. ONLINE: Gemini Native Audio Engine (Charon Voice Model - same as desktop JARVIS).
  * 2. OFFLINE: Local On-Device Voice AI Synthesizer (zero downloads required).
  */
-suspend fun speakWithVoiceModel(context: android.content.Context, text: String) {
+suspend fun speakWithVoiceModel(
+    context: android.content.Context,
+    text: String,
+    ttsManager: TextToSpeechManager? = null
+) {
     val usedGemini = GeminiVoiceEngine.speak(context, text)
     if (!usedGemini) {
-        com.jarvis.voice.LocalVoiceModel.speak(context, text)
+        if (ttsManager != null && ttsManager.ttsState.value !is TtsState.Error) {
+            ttsManager.speak(text)
+        } else {
+            com.jarvis.voice.LocalVoiceModel.speak(context, text)
+        }
     }
 }
 
@@ -188,7 +196,7 @@ fun JarvisMainTerminalScreen(
                         isOnline = !usedModel.contains("OFFLINE")
                         chatMessages.add(ChatMessage("JARVISH", response, false, modelName = usedModel))
                         lastResponseText = response
-                        speakWithVoiceModel(context, response)
+                        speakWithVoiceModel(context, response, ttsManager)
                     } catch (e: Exception) {
                         chatMessages.add(ChatMessage("JARVISH", "[ERROR] ${e.message}", false, modelName = activeModelDisplay))
                     } finally {
@@ -431,7 +439,7 @@ fun JarvisMainTerminalScreen(
                                 isOnline = !usedModel.contains("OFFLINE")
                                 chatMessages.add(ChatMessage("JARVISH", response, false, modelName = usedModel))
                                 lastResponseText = response
-                                speakWithVoiceModel(context, response)
+                                speakWithVoiceModel(context, response, ttsManager)
                             } catch (e: Exception) {
                                 chatMessages.add(ChatMessage("JARVISH", "[ERROR] ${e.message}", false, modelName = activeModelDisplay))
                             } finally {
