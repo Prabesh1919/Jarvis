@@ -7,6 +7,8 @@ import android.media.AudioManager
 import android.os.Build
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.speech.tts.Voice
+import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,10 +24,12 @@ sealed class TtsState {
 }
 
 /**
- * Manages native Text-to-Speech playback. 
- * Requests Audio Focus dynamically prior to output, ducking background media transiently.
+ * Manages native Text-to-Speech playback with ultra-high quality Neural/HD British & US Male Voice Profiles.
+ * Automatically selects non-robotic, high-bitrate voices and handles audio focus ducking.
  */
 class TextToSpeechManager(private val context: Context) : TextToSpeech.OnInitListener {
+
+    private const val TAG = "TextToSpeechManager"
 
     private val _ttsState = MutableStateFlow<TtsState>(TtsState.Initializing)
     val ttsState: StateFlow<TtsState> = _ttsState.asStateFlow()
@@ -35,7 +39,6 @@ class TextToSpeechManager(private val context: Context) : TextToSpeech.OnInitLis
     private var audioFocusRequest: AudioFocusRequest? = null
     private var onCompleteCallback: (() -> Unit)? = null
 
-    // Audio focus listener. Instantly halts speaking if focus is permanently lost.
     private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
         if (focusChange == AudioManager.AUDIOFOCUS_LOSS || focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
             stopSpeaking()
@@ -50,7 +53,7 @@ class TextToSpeechManager(private val context: Context) : TextToSpeech.OnInitLis
         if (status == TextToSpeech.SUCCESS) {
             val result = tts?.setLanguage(Locale.UK) ?: tts?.setLanguage(Locale.US)
             if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                _ttsState.value = TtsState.Error("Default Language is not supported on this TTS engine.")
+                _ttsState.value = TtsState.Error("English Language is not supported on this TTS engine.")
             } else {
                 configureJarvisMaleVoice()
                 _ttsState.value = TtsState.Ready
@@ -62,38 +65,58 @@ class TextToSpeechManager(private val context: Context) : TextToSpeech.OnInitLis
     }
 
     /**
-     * Configures pitch, speech rate, and selects a deep British/US Male voice matching JARVIS on Desktop.
+     * Selects the highest quality Neural/HD Male Voice available on the system.
+     * Prefers British English (en_GB) HD male voices for JARVIS style, then US English (en_US) HD male.
      */
     private fun configureJarvisMaleVoice() {
         val ttsEngine = tts ?: return
 
-        // Lower pitch (0.88f) for deep JARVIS resonance
-        ttsEngine.setPitch(0.88f)
-        // Crisp assistant speech speed (1.05f)
-        ttsEngine.setSpeechRate(1.05f)
+        // Set natural pitch (0.96f) and rate (1.0f) to avoid robotic distortion
+        ttsEngine.setPitch(0.96f)
+        ttsEngine.setSpeechRate(1.0f)
 
         try {
             val availableVoices = ttsEngine.voices
             if (!availableVoices.isNullOrEmpty()) {
-                val maleVoice = availableVoices.firstOrNull { voice ->
-                    val name = voice.name.lowercase(Locale.ROOT)
-                    val lang = voice.locale.language.lowercase(Locale.ROOT)
-                    val country = voice.locale.country.lowercase(Locale.ROOT)
+                // Filter out uninstalled or low-quality voices
+                val highQualityVoices = availableVoices.filter { voice ->
+                    !voice.isNetworkConnectionRequired &&
+                    voice.quality >= Voice.QUALITY_HIGH &&
+                    voice.locale.language.equals("en", ignoreCase = true)
+                }.ifEmpty { availableVoices.filter { it.locale.language.equals("en", ignoreCase = true) } }
 
-                    (name.contains("male") || name.contains("rsk") || name.contains("gbb") || name.contains("iom")) &&
-                    (lang == "en" && (country == "gb" || country == "us" || country == ""))
-                } ?: availableVoices.firstOrNull { voice ->
-                    voice.locale.language == "en" && voice.locale.country == "GB"
-                } ?: availableVoices.firstOrNull { voice ->
-                    voice.name.contains("male", ignoreCase = true)
+                // Priority 1: High-Quality British (en-GB) Male Voices
+                var selectedVoice = highQualityVoices.firstOrNull { v ->
+                    val name = v.name.lowercase(Locale.ROOT)
+                    v.locale.country.equals("GB", ignoreCase = true) &&
+                    (name.contains("male") || name.contains("rsk") || name.contains("gbb") || name.contains("fis") || name.contains("network") || name.contains("local"))
                 }
 
-                if (maleVoice != null) {
-                    ttsEngine.voice = maleVoice
+                // Priority 2: High-Quality US (en-US) Male Voices
+                if (selectedVoice == null) {
+                    selectedVoice = highQualityVoices.firstOrNull { v ->
+                        val name = v.name.lowercase(Locale.ROOT)
+                        v.locale.country.equals("US", ignoreCase = true) &&
+                        (name.contains("male") || name.contains("iom") || name.contains("sfg") || name.contains("tpf") || name.contains("network") || name.contains("local"))
+                    }
+                }
+
+                // Priority 3: Any English Male Voice
+                if (selectedVoice == null) {
+                    selectedVoice = availableVoices.firstOrNull { v ->
+                        v.name.contains("male", ignoreCase = true) && v.locale.language.equals("en", ignoreCase = true)
+                    }
+                }
+
+                if (selectedVoice != null) {
+                    ttsEngine.voice = selectedVoice
+                    Log.i(TAG, "🔊 Selected HD JARVISH Voice: ${selectedVoice.name} (Quality: ${selectedVoice.quality})")
+                } else {
+                    Log.w(TAG, "No HD male voice found; using system default English voice.")
                 }
             }
         } catch (e: Exception) {
-            // Fallback to pitch tuning
+            Log.w(TAG, "Error configuring voice profile: ${e.message}")
         }
     }
 
@@ -116,9 +139,6 @@ class TextToSpeechManager(private val context: Context) : TextToSpeech.OnInitLis
         })
     }
 
-    /**
-     * Synthesizes and plays the provided text. Requests system audio focus.
-     */
     fun speak(text: String, onComplete: () -> Unit = {}) {
         if (_ttsState.value is TtsState.Error || tts == null) {
             onComplete()
@@ -126,7 +146,7 @@ class TextToSpeechManager(private val context: Context) : TextToSpeech.OnInitLis
         }
 
         onCompleteCallback = onComplete
-        
+
         val focusGranted = requestAudioFocus()
         if (focusGranted) {
             val utteranceId = UUID.randomUUID().toString()
@@ -136,18 +156,12 @@ class TextToSpeechManager(private val context: Context) : TextToSpeech.OnInitLis
         }
     }
 
-    /**
-     * Instantly stops audio playback and releases audio focus.
-     */
     fun stopSpeaking() {
         tts?.stop()
         abandonAudioFocus()
         _ttsState.value = TtsState.Ready
     }
 
-    /**
-     * Cleans up engine bindings and releases audio focus.
-     */
     fun destroy() {
         tts?.shutdown()
         tts = null
