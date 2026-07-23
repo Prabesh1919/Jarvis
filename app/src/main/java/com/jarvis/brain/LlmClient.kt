@@ -14,7 +14,7 @@ import java.net.URL
 
 /**
  * Lightweight native client to communicate with the Gemini Developer API.
- * Uses only standard HttpURLConnection and org.json parsing to avoid bulky external dependencies.
+ * Uses standard HttpURLConnection and org.json parsing to avoid bulky dependencies.
  */
 object LlmClient {
 
@@ -27,10 +27,10 @@ object LlmClient {
             ?: throw IllegalStateException("Gemini API Key is not configured. Please set it first.")
         
         val baseUrl = AppConfig.getLlmBaseUrl(context)
-        val model = AppConfig.getLlmModel(context)
+        val rawModel = AppConfig.getLlmModel(context)
+        val modelPath = if (rawModel.startsWith("models/")) rawModel.removePrefix("models/") else rawModel
         
-        // Build Endpoint URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=YOUR_KEY
-        val spec = "$baseUrl/models/$model:generateContent?key=$apiKey"
+        val spec = "$baseUrl/models/$modelPath:generateContent?key=$apiKey"
         val url = URL(spec)
         val connection = url.openConnection() as HttpURLConnection
 
@@ -41,12 +41,6 @@ object LlmClient {
             connection.doOutput = true
             connection.setRequestProperty("Content-Type", "application/json")
 
-            // Construct JSON request body:
-            // {
-            //   "contents": [{
-            //     "parts": [{"text": prompt}]
-            //   }]
-            // }
             val requestJson = JSONObject().apply {
                 put("contents", JSONArray().apply {
                     put(JSONObject().apply {
@@ -59,23 +53,20 @@ object LlmClient {
                 })
             }
 
-            // Write output stream
-            OutputStreamWriter(connection.outputStream).use { writer ->
+            OutputStreamWriter(connection.outputStream, "UTF-8").use { writer ->
                 writer.write(requestJson.toString())
                 writer.flush()
             }
 
             val responseCode = connection.responseCode
             if (responseCode == HttpURLConnection.HTTP_OK) {
-                // Read response stream
-                BufferedReader(InputStreamReader(connection.inputStream)).use { reader ->
+                BufferedReader(InputStreamReader(connection.inputStream, "UTF-8")).use { reader ->
                     val response = StringBuilder()
                     var line: String?
                     while (reader.readLine().also { line = it } != null) {
                         response.append(line)
                     }
 
-                    // Parse JSON response: response.candidates[0].content.parts[0].text
                     val responseJson = JSONObject(response.toString())
                     val candidates = responseJson.getJSONArray("candidates")
                     if (candidates.length() > 0) {
@@ -89,10 +80,9 @@ object LlmClient {
                     throw IllegalStateException("Received empty content representation from Gemini.")
                 }
             } else {
-                // Read error stream
                 val errorStream = connection.errorStream
                 val errorResponse = if (errorStream != null) {
-                    BufferedReader(InputStreamReader(errorStream)).use { reader ->
+                    BufferedReader(InputStreamReader(errorStream, "UTF-8")).use { reader ->
                         val response = java.lang.StringBuilder()
                         var line: String?
                         while (reader.readLine().also { line = it } != null) {
